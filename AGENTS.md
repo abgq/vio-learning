@@ -17,15 +17,20 @@ This file is read by more than one AI model. The **Frozen Conventions** and **Fi
    - **Deterministic Execution:** Enforce the Memory Discipline tiers below. No heap allocation in the filter core after construction; state matrices are fixed-size or fixed-*max*-size Eigen types.
    - **Modern C++20 Idioms:** `[[nodiscard]]`, `constexpr`, `noexcept` on the hot path, `std::span` for contiguous buffers, `std::chrono::nanoseconds` for time, frame-annotated naming (see Conventions). Flag the Eigen pitfalls listed under Engineering Constraints.
    - **Modern CMake:** Pure target-based scoping (`target_link_libraries`, `target_include_directories`, `target_compile_options`), warnings applied only to project targets, third-party headers consumed as `SYSTEM`, sanitizers that actually fail the test run.
-4. **Scaffold with Signatures & Mathematics:** Provide class interfaces, mathematical definitions, and unit test requirements. Leave algorithmic loops, matrix calculations, and filter logic for me to implement. **Jacobians ($F_c$, $G_c$, $H$, cloning $J$) are derived by me**: guide the derivation, check it against numerical differentiation, and once verified have me record it in `docs/derivations.md`. After that, the recorded result is part of the spec.
+4. **Scaffold with Signatures & Mathematics:** Provide class interfaces, mathematical definitions, and unit test requirements. Leave algorithmic loops, matrix calculations, and filter logic for me to implement. **Jacobians ($F_c$, $G_c$, $H$, cloning $J$) are derived by me**: guide the derivation, check it against numerical differentiation, and once verified have me record it in `DOCS/derivations.md`. After that, the recorded result is part of the spec.
 5. **Strict Milestone Gating:** Never skip ahead until the current milestone meets **every Exit Criterion** in `MILESTONES.md`, including the Global Exit Criteria (clean build under both presets, all Catch2 tests passing, zero ASan/UBSan reports). **After a milestone is completed, pause, summarize key takeaways, update `PROGRESS.md`, and explicitly wait for my command to proceed.**
+
+### Documentation & Lecture Notes (The DOCS Folder)
+- **Task Assignments:** When breaking down a milestone into actionable steps for the user, do not just list them in chat. Create or update a file in `DOCS/TASKS/<Milestone>.md` detailing the specific requirements, constraints, and questions to answer.
+- **Lecture Notes:** When explaining project architecture, boilerplate code, or core concepts, generate numbered markdown lecture notes in the `DOCS/` folder (e.g., `DOCS/01_CMake_and_Presets.md`).
+- **Organic Knowledge Capture:** Whenever the user asks clarifying questions in chat (e.g., "What is a frame pointer?", "How do defaults work?"), the answers must be smoothly and explicitly woven into the corresponding lecture note. The document must act as a self-contained goldmine of knowledge that preemptively answers those questions without reading like a raw Q&A chat log.
 
 ---
 
 ## Session Protocol
 1. At the start of every session, read `PROGRESS.md` and state the current milestone, its status, and any open questions logged there. Then wait for my command.
 2. Any new design decision (a scheme choice, a constant, a tolerance, a deviation from this file) goes into the `PROGRESS.md` decision log with a date and rationale.
-3. The models share no memory. Assume only `AGENTS.md`, `MILESTONES.md`, `PROGRESS.md`, `docs/derivations.md` and the code carry context between sessions.
+3. The models share no memory. Assume only `AGENTS.md`, `MILESTONES.md`, `PROGRESS.md`, `DOCS/derivations.md` and the code carry context between sessions.
 
 ---
 
@@ -105,7 +110,7 @@ $$\hat a = a_m - \hat b_a,\quad \hat\omega = \omega_m - \hat b_g;\qquad \dot p =
 The discrete integration scheme is chosen and justified in M4 and then logged in `PROGRESS.md`. The attitude update is always multiplicative: $q \leftarrow q \otimes \mathrm{Exp}_q(\hat\omega\,\Delta t)$, then normalize.
 
 ### F2. Error Dynamics & Discretization
-- $\dot{\delta x}_I = F_c\,\delta x_I + G_c\, w$, with $F_c \in \mathbb{R}^{15\times15}$ and $G_c \in \mathbb{R}^{15\times12}$, derived under C3/C4/C6 and recorded in `docs/derivations.md`.
+- $\dot{\delta x}_I = F_c\,\delta x_I + G_c\, w$, with $F_c \in \mathbb{R}^{15\times15}$ and $G_c \in \mathbb{R}^{15\times12}$, derived under C3/C4/C6 and recorded in `DOCS/derivations.md`.
 - $\Phi \approx I + F_c\,\Delta t$ (a higher-order option may be adopted if logged). $Q_c = \mathrm{diag}(\sigma_a^2 I,\ \sigma_g^2 I,\ \sigma_{b_a}^2 I,\ \sigma_{b_g}^2 I)$ uses the continuous densities from C7. $Q_d \approx G_c\, Q_c\, G_c^T\, \Delta t$.
 - IMU block: $P_{II} \leftarrow \Phi P_{II} \Phi^T + Q_d$. Clones are static: $P_{IC} \leftarrow \Phi P_{IC}$, and $P_{CC}$ is unchanged.
 - Re-symmetrize $P \leftarrow \tfrac12(P + P^T)$ after propagation and after every update.
@@ -139,8 +144,10 @@ vio/
 ├── CMakeLists.txt  CMakePresets.json  .gitignore
 ├── cmake/                        # Warnings.cmake, Dependencies.cmake
 ├── data/                         # EuRoC ASL folders (git-ignored)
-├── docs/
-│   └── derivations.md            # verified Jacobians, frozen once checked
+├── DOCS/
+│   ├── derivations.md            # verified Jacobians, frozen once checked
+│   ├── TASKS/                    # <Milestone>.md files for actionable user steps
+│   └── <NN>_<Topic>.md           # Numbered lecture notes organically capturing concepts
 ├── scripts/                      # plotting / NEES / ATE (Python, evo)
 ├── include/vio/
 │   ├── types.hpp                 # events, IMU sample, state structs, constants
@@ -218,11 +225,11 @@ Enforcement: an allocation-guard test utility (`tests/support/alloc_guard.hpp`, 
 ## Reviewer Mode Checklist
 Use this when invoked with "checkpoint review" or "review milestone N".
 
-1. **Context:** read `PROGRESS.md`, the milestone's Exit Criteria in `MILESTONES.md`, and `docs/derivations.md`.
+1. **Context:** read `PROGRESS.md`, the milestone's Exit Criteria in `MILESTONES.md`, and `DOCS/derivations.md`.
 2. **Build from clean** with the MSYS2 CLANG64 toolchain using both presets: configure, build, `ctest --preset <name>`. Report the exact commands and outcomes. Zero warnings, zero test failures, zero sanitizer reports.
 3. **Convention audit (C1–C6):** rotation direction and naming, local perturbation everywhere (residuals, $H$, injection, reset $G$), quaternion coefficient order at every I/O boundary, normalization after every multiplicative update, `nanoseconds` timestamps, gravity sign.
 4. **Memory audit (E4):** Core hot paths are covered by allocation-guard tests, and there are no dynamic Eigen types without a Max size, no `std::vector` growth, and no function-local large temporaries.
-5. **Math audit:** each Jacobian introduced has a derivation in `docs/derivations.md` and a finite-difference test. Spot-check one derivation by hand.
+5. **Math audit:** each Jacobian introduced has a derivation in `DOCS/derivations.md` and a finite-difference test. Spot-check one derivation by hand.
 6. **Test quality:** for at least one critical test, name the sign flip or bug that it would catch, or show that it would not catch it.
 7. **Verdict per Exit Criterion:** `PASS` / `PASS WITH NITS` / `FAIL`, with file:line references. Blocking issues are described and explained, **not fixed**. Short fix snippets (≤10 lines) are allowed only for build, CMake or idiom issues; never for filter math.
 8. **Append a dated entry to the Review Log in `PROGRESS.md`.**
