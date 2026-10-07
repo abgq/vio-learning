@@ -1,0 +1,277 @@
+% ==============================================================================
+% preamble.tex -- packages, layout, environments and notation for guide.tex
+% ==============================================================================
+
+% ---------------------------------------------------------------- fonts & math
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{newpxtext}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{amsthm}
+\usepackage[varbb]{newpxmath}
+\usepackage[scaled=0.92,varqu,varl]{inconsolata}
+% Inconsolata has no italic: typeset code upright inside italic text (theorems, captions)
+\AtBeginDocument{%
+  \fontencoding{T1}\fontfamily{zi4}\selectfont\normalfont % load T1/zi4 before extending it
+  \DeclareFontShape{T1}{zi4}{m}{it}{<->ssub*zi4/m/n}{}%
+  \DeclareFontShape{T1}{zi4}{b}{it}{<->ssub*zi4/b/n}{}}
+\usepackage{bm}
+\usepackage{microtype}
+\pdfmapline{=txexs txexs <txexs.pfb} % Type 1 version of the newtx extension symbols (missing from some MiKTeX maps)
+
+% ---------------------------------------------------------------------- layout
+\usepackage[a4paper, top=26mm, bottom=28mm, inner=28mm, outer=28mm,
+            headheight=15pt, marginparwidth=20mm]{geometry}
+\usepackage{setspace}
+\setstretch{1.08}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em plus 0.2em minus 0.1em}
+\usepackage{emptypage}
+
+% ---------------------------------------------------------- colors & graphics
+\usepackage[dvipsnames,table]{xcolor}
+\definecolor{primary}{RGB}{16, 62, 120}
+\definecolor{primarylight}{RGB}{232, 240, 250}
+\definecolor{conv}{RGB}{170, 30, 30}
+\definecolor{convlight}{RGB}{253, 240, 240}
+\definecolor{warn}{RGB}{200, 110, 0}
+\definecolor{warnlight}{RGB}{255, 246, 230}
+\definecolor{impl}{RGB}{70, 70, 70}
+\definecolor{impllight}{RGB}{245, 245, 245}
+\definecolor{proj}{RGB}{20, 110, 70}
+\definecolor{projlight}{RGB}{234, 247, 239}
+\definecolor{deriv}{RGB}{100, 50, 140}
+\definecolor{derivlight}{RGB}{245, 238, 252}
+\definecolor{plotblue}{HTML}{0072B2}
+\definecolor{plotorange}{HTML}{D55E00}
+\definecolor{plotgreen}{HTML}{009E73}
+\definecolor{plotpurple}{HTML}{CC79A7}
+\definecolor{plotyellow}{HTML}{E69F00}
+
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc, decorations.pathreplacing,
+                shapes.geometric, shapes.misc, fit, backgrounds, patterns, 3d,
+                matrix, decorations.markings, shadows}
+\tikzset{
+  >={Stealth[length=2.2mm]},
+  frameaxis/.style={->, line width=1pt},
+  block/.style={draw=primary, fill=primarylight, rounded corners=2pt, align=center,
+                minimum height=9mm, inner sep=4pt, font=\small},
+  note/.style={font=\footnotesize, align=center},
+}
+
+% ------------------------------------------------------------- tables & lists
+\usepackage{booktabs}
+\usepackage{tabularx}
+\renewcommand{\tabularxcolumn}[1]{>{\raggedright\arraybackslash}p{#1}} % ragged-right X columns
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage[shortlabels]{enumitem}
+\setlist{itemsep=0.25em, topsep=0.35em, parsep=0.15em}
+\usepackage{caption}
+\usepackage{subcaption}
+\captionsetup{font=small, labelfont={bf,color=primary}, format=hang, width=0.94\linewidth}
+\usepackage{float}
+\usepackage{placeins}
+\usepackage{siunitx}
+\sisetup{per-mode=symbol, range-phrase=--, group-digits=integer}
+
+% -------------------------------------------------------------------- code
+\usepackage{listings}
+\lstdefinestyle{cpp}{
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{primary}\bfseries,
+  commentstyle=\color{proj}\itshape,
+  stringstyle=\color{conv},
+  backgroundcolor=\color{impllight},
+  frame=single, rulecolor=\color{black!15}, framesep=4pt,
+  numbers=none, breaklines=true, showstringspaces=false,
+  columns=fullflexible, keepspaces=true,
+  morekeywords={constexpr, noexcept, nodiscard, consteval, concept, requires, nullptr}
+}
+\lstset{style=cpp}
+
+% ---------------------------------------------------------------- algorithms
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+\algrenewcommand\algorithmicrequire{\textbf{Input:}}
+\algrenewcommand\algorithmicensure{\textbf{Output:}}
+\algnewcommand{\LineComment}[1]{\State \textcolor{proj}{\(\triangleright\) \textit{#1}}}
+
+% ------------------------------------------------------- headings & headers
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\normalfont\color{primary}}
+  {\large\scshape\chaptertitlename\ \thechapter}
+  {6pt}
+  {\Huge\bfseries}
+  [\vspace{3pt}{\color{primary}\titlerule[1.2pt]}]
+\titlespacing*{\chapter}{0pt}{-10pt}{26pt}
+\titleformat{\section}{\normalfont\Large\bfseries\color{primary}}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries\color{primary!85!black}}{\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\normalfont\normalsize\bfseries}{\thesubsubsection}{0.8em}{}
+\titleformat{\part}[display]
+  {\centering\normalfont\color{primary}}
+  {\LARGE\scshape Part \thepart}
+  {14pt}
+  {\Huge\bfseries}
+\setcounter{secnumdepth}{2}
+\setcounter{tocdepth}{1}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\makeatletter
+\renewcommand{\chaptermark}[1]{\markboth{\if@mainmatter\thechapter.\ \fi #1}{}}
+\makeatother
+\renewcommand{\sectionmark}[1]{\markright{\thesection\ \ #1}}
+\fancyhead[L]{\small\color{primary!80!black}\scshape\nouppercase{\leftmark}}
+\fancyhead[R]{\small\color{primary!80!black}\nouppercase{\rightmark}}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\thepage}\renewcommand{\headrulewidth}{0pt}}
+
+% ---------------------------------------------------------------- hyperlinks
+\usepackage[pdftex, colorlinks=true, linkcolor=primary, citecolor=proj,
+            urlcolor=conv, bookmarksnumbered=true, bookmarksopen=true,
+            pdftitle={From Zero to MSCKF: Lecture Notes on Visual-Inertial Odometry},
+            pdfsubject={Visual-inertial odometry, Lie theory, ES-EKF, MSCKF}]{hyperref}
+\usepackage[nameinlink, capitalize, noabbrev]{cleveref}
+\usepackage{bookmark}
+\makeatletter % unique hyperref anchors for algorithm lines across algorithms
+\providecommand{\theHALG@line}{}
+\renewcommand{\theHALG@line}{\thealgorithm.\arabic{ALG@line}}
+\makeatother
+
+% ------------------------------------------------------ theorem environments
+\newtheoremstyle{notesplain}{6pt}{6pt}{\itshape}{}{\bfseries\color{primary}}{.}{0.5em}{}
+\newtheoremstyle{notesdef}{6pt}{6pt}{\normalfont}{}{\bfseries\color{primary}}{.}{0.5em}{}
+\newtheoremstyle{notesrem}{6pt}{6pt}{\normalfont}{}{\bfseries\itshape\color{primary!80!black}}{.}{0.5em}{}
+\theoremstyle{notesplain}
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{notesdef}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\theoremstyle{notesrem}
+\newtheorem{remark}[theorem]{Remark}
+\crefname{theorem}{Theorem}{Theorems}
+\crefname{proposition}{Proposition}{Propositions}
+\crefname{lemma}{Lemma}{Lemmas}
+\crefname{corollary}{Corollary}{Corollaries}
+\crefname{definition}{Definition}{Definitions}
+\crefname{example}{Example}{Examples}
+\crefname{remark}{Remark}{Remarks}
+\renewcommand{\qedsymbol}{\color{primary}$\blacksquare$}
+
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{breakable, skins, theorems}
+\tcolorboxenvironment{theorem}{blanker, breakable, borderline west={2pt}{0pt}{primary}, left=9pt, before skip=8pt, after skip=8pt}
+\tcolorboxenvironment{proposition}{blanker, breakable, borderline west={2pt}{0pt}{primary}, left=9pt, before skip=8pt, after skip=8pt}
+\tcolorboxenvironment{lemma}{blanker, breakable, borderline west={2pt}{0pt}{primary!60}, left=9pt, before skip=8pt, after skip=8pt}
+\tcolorboxenvironment{corollary}{blanker, breakable, borderline west={2pt}{0pt}{primary!60}, left=9pt, before skip=8pt, after skip=8pt}
+\tcolorboxenvironment{definition}{blanker, breakable, colback=primarylight, left=9pt, right=6pt, top=4pt, bottom=4pt, borderline west={2pt}{0pt}{primary}, before skip=8pt, after skip=8pt}
+\tcolorboxenvironment{example}{blanker, breakable, borderline west={1pt}{0pt}{proj}, left=9pt, before skip=8pt, after skip=8pt}
+
+% ------------------------------------------------------------- callout boxes
+\newtcolorbox{keyidea}[1][]{enhanced, breakable, colback=primarylight, colframe=primary,
+  boxrule=0.7pt, arc=1.5mm, left=8pt, right=8pt, top=5pt, bottom=5pt,
+  fonttitle=\bfseries\small, title={Key idea\ifx\relax#1\relax\else: #1\fi},
+  before skip=10pt, after skip=10pt}
+\newtcolorbox{convention}[1][]{enhanced, breakable, colback=convlight, colframe=conv,
+  boxrule=0.9pt, arc=1.5mm, left=8pt, right=8pt, top=5pt, bottom=5pt,
+  fonttitle=\bfseries\small, title={Frozen convention\ifx\relax#1\relax\else: #1\fi},
+  before skip=10pt, after skip=10pt}
+\newtcolorbox{pitfall}[1][]{enhanced, breakable, colback=warnlight, colframe=warn,
+  boxrule=0.7pt, arc=1.5mm, left=8pt, right=8pt, top=5pt, bottom=5pt,
+  fonttitle=\bfseries\small, title={Pitfall\ifx\relax#1\relax\else: #1\fi},
+  before skip=10pt, after skip=10pt}
+\newtcolorbox{implnote}[1][]{enhanced, breakable, colback=impllight, colframe=impl,
+  boxrule=0.6pt, arc=1.5mm, left=8pt, right=8pt, top=5pt, bottom=5pt,
+  fonttitle=\bfseries\small, title={Implementation note\ifx\relax#1\relax\else: #1\fi},
+  before skip=10pt, after skip=10pt}
+\newtcolorbox{projectlink}[1][]{enhanced, breakable, colback=projlight, colframe=proj,
+  boxrule=0.6pt, arc=1.5mm, left=8pt, right=8pt, top=4pt, bottom=4pt,
+  fonttitle=\bfseries\small, title={Project link\ifx\relax#1\relax\else: #1\fi},
+  before skip=10pt, after skip=10pt}
+\newtcolorbox{objectives}{enhanced, breakable, colback=white, colframe=primary!60,
+  boxrule=0.5pt, arc=0mm, left=8pt, right=8pt, top=4pt, bottom=4pt,
+  fonttitle=\bfseries\small\color{primary}, coltitle=primary, colbacktitle=primarylight,
+  title={In this chapter}, before skip=4pt, after skip=12pt}
+\newtcolorbox{takeaways}{enhanced, breakable, colback=primarylight!60, colframe=primary,
+  boxrule=0.8pt, arc=1.5mm, left=8pt, right=8pt, top=5pt, bottom=5pt,
+  fonttitle=\bfseries, title={Key takeaways}, before skip=14pt, after skip=10pt}
+
+% Derivation exercises for the project Jacobians (AGENTS.md Guardrail 4).
+% Full solutions live in the appendix, which is compiled only when \ifsolutions.
+\newif\ifsolutions
+\ifdefined\NoSolutions \solutionsfalse \else \solutionstrue \fi
+\newtcolorbox{derivex}[2]{enhanced, breakable, colback=derivlight, colframe=deriv,
+  boxrule=0.9pt, arc=1.5mm, left=8pt, right=8pt, top=5pt, bottom=5pt,
+  fonttitle=\bfseries\small, title={Derivation exercise (project Jacobian): #1},
+  before skip=10pt, after skip=10pt,
+  after upper={\par\smallskip\hfill\footnotesize\itshape
+    \ifsolutions Worked solution: \cref{#2} (page~\pageref{#2}).\else
+    The worked solution is omitted from this edition; build without \texttt{NoSolutions} to include it.\fi}}
+
+% Exercise lists at chapter ends
+\newcounter{exercisectr}[chapter]
+\newenvironment{exercises}{%
+  \section*{Exercises}\addcontentsline{toc}{section}{Exercises}%
+  \begin{enumerate}[label={\color{primary}\bfseries\thechapter.\arabic*}, leftmargin=2.6em, itemsep=0.55em]}%
+  {\end{enumerate}}
+
+% ------------------------------------------------------------------ notation
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\T}{^{\mathsf{T}}}
+\newcommand{\mT}{^{-\mathsf{T}}}
+\newcommand{\inv}{^{-1}}
+\newcommand{\sx}[1]{[#1]_{\times}}
+\newcommand{\qprod}{\otimes}
+\newcommand{\Dt}{{\Delta t}} % braced: safe in sub/superscripts, \sqrt and \frac
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\SO}{\mathrm{SO}(3)}
+\newcommand{\so}{\mathfrak{so}(3)}
+\newcommand{\SE}{\mathrm{SE}(3)}
+\newcommand{\se}{\mathfrak{se}(3)}
+\newcommand{\Jr}{J_r}
+\newcommand{\Jl}{J_l}
+\newcommand{\Jrinv}{J_r^{-1}}
+\newcommand{\Jlinv}{J_l^{-1}}
+\newcommand{\dth}{{\delta\theta}}
+\newcommand{\dx}{{\delta x}}
+\newcommand{\bplus}{\boxplus}
+\newcommand{\bminus}{\boxminus}
+\newcommand{\code}[1]{{\upshape\ttfamily #1}}
+\newcommand{\hatop}{^{\wedge}}
+\newcommand{\veeop}{^{\vee}}
+\newcommand{\mach}{\varepsilon_{\mathrm{mach}}}
+\DeclareMathOperator{\Exp}{Exp}
+\DeclareMathOperator{\Log}{Log}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\blkdiag}{blkdiag}
+\DeclareMathOperator{\rank}{rank}
+\DeclareMathOperator{\Cov}{Cov}
+\DeclareMathOperator{\Var}{Var}
+\DeclareMathOperator{\atantwo}{atan2}
+\DeclareMathOperator{\vect}{vec}
+\DeclareMathOperator{\Ad}{Ad}
+\DeclareMathOperator{\ad}{ad}
+\DeclareMathOperator{\range}{range}
+\DeclareMathOperator{\nullsp}{null}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator{\sinc}{sinc}
+
+\newcommand{\figref}[1]{\cref{#1}}

@@ -1,0 +1,96 @@
+\chapter{The EuRoC MAV Dataset}
+\label{app:euroc}
+
+The EuRoC MAV dataset~\cite{burri2016euroc} was recorded with an AscTec Firefly hexacopter carrying a VI-Sensor: two global-shutter
+MT9V034 cameras ($752\times480$, 20~Hz) and an ADIS16448 MEMS IMU (200~Hz), hardware time-synchronized and calibrated with Kalibr.
+The values below are those of the published calibration files; check them against your copy.
+
+\section*{Directory layout}
+
+The project keeps sequences under \code{data/<sequence>/mav0/} (git-ignored). Each sequence contains:
+\begin{center}\small
+\begin{tabularx}{\textwidth}{@{}l X@{}}
+\toprule
+Path & Content \\
+\midrule
+\code{imu0/data.csv} & \code{timestamp [ns], w\_x, w\_y, w\_z [rad/s], a\_x, a\_y, a\_z [m/s\textsuperscript{2}]}: $\omega_m$, $a_m$ in $B$ \\
+\code{imu0/sensor.yaml} & IMU noise densities (continuous time), rate, \code{T\_BS} (identity for the IMU) \\
+\code{cam0/data.csv} & \code{timestamp [ns], filename} \\
+\code{cam0/data/} & PNG images named by timestamp \\
+\code{cam0/sensor.yaml} & \code{T\_BS} (row-major $4\times4$), \code{intrinsics}, \code{distortion\_coefficients}, resolution, rate \\
+\code{cam1/} & right camera (unused; stereo is a stretch goal) \\
+\code{state\_groundtruth\_estimate0/data.csv} & \code{timestamp, p\_RS\_R (3), q\_RS (w,x,y,z), v\_RS\_R (3), b\_w\_RS\_S (3), b\_a\_RS\_S (3)} \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{pitfall}[ground-truth column order]
+In the ground-truth file the quaternion is stored $w$ first, and the \emph{gyroscope} bias precedes the \emph{accelerometer} bias. The file
+starts later than the IMU file, and its velocities and biases come from the dataset authors' own estimator that fused the
+tracking-system data with the IMU, so they are reference values, not perfect truth. The project maps the columns to
+$p_{wb}, q_{wb}, v_{wb}, b_g, b_a$ (AGENTS.md C7).
+\end{pitfall}
+
+\section*{IMU parameters (\texttt{imu0/sensor.yaml})}
+
+\begin{center}\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+Key & Value & Units \\
+\midrule
+\code{gyroscope\_noise\_density} & $1.6968\times10^{-4}$ & $\mathrm{rad/s/\sqrt{Hz}}$ \\
+\code{gyroscope\_random\_walk} & $1.9393\times10^{-5}$ & $\mathrm{rad/s^2/\sqrt{Hz}}$ \\
+\code{accelerometer\_noise\_density} & $2.0\times10^{-3}$ & $\mathrm{m/s^2/\sqrt{Hz}}$ \\
+\code{accelerometer\_random\_walk} & $3.0\times10^{-3}$ & $\mathrm{m/s^3/\sqrt{Hz}}$ \\
+\code{rate\_hz} & 200 & Hz \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{Camera parameters (\texttt{cam0/sensor.yaml})}
+
+\begin{center}\small
+\begin{tabular}{@{}l l@{}}
+\toprule
+\code{intrinsics} $[f_u, f_v, c_u, c_v]$ & $[458.654,\ 457.296,\ 367.215,\ 248.375]$ \\
+\code{distortion\_model} & \code{radial-tangential} \\
+\code{distortion\_coefficients} $[k_1, k_2, p_1, p_2]$ & $[-0.28340811,\ 0.07395907,\ 0.00019359,\ 1.76187114\times10^{-5}]$ \\
+\code{resolution} & $752\times480$ \\
+\code{rate\_hz} & 20 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The extrinsic calibration \code{T\_BS} of \code{cam0} is the project's $T_{bc}$:
+\begin{equation*}
+  T_{bc} \approx \begin{bmatrix}
+    0.0148655 & -0.9998809 & 0.0041403 & -0.0216401 \\
+    0.9995572 & 0.0149672 & 0.0257155 & -0.0646770 \\
+    -0.0257744 & 0.0037562 & 0.9996607 & 0.0098107 \\
+    0 & 0 & 0 & 1
+  \end{bmatrix}.
+\end{equation*}
+Its third column shows that the optical axis $z_c$ is almost exactly the body $z$-axis, and its first two columns that the camera
+$x$-axis is close to body $y$ and the camera $y$-axis close to body $-x$. The camera center sits about 7~cm from the IMU. At rest, the
+EuRoC accelerometer reads close to $+g$ on its $x$-axis, so the body $x$-axis points roughly up. Verify both facts on your data: they are
+exactly the kind of sanity check that catches a transposed extrinsic.
+
+\section*{Sequences}
+
+\begin{center}\small
+\begin{tabular}{@{}l l l l@{}}
+\toprule
+Sequence & Environment & Difficulty & Ground truth \\
+\midrule
+MH\_01\_easy, MH\_02\_easy & machine hall & easy & laser tracker (position) \\
+MH\_03\_medium & machine hall & medium & laser tracker (position) \\
+MH\_04\_difficult, MH\_05\_difficult & machine hall & difficult (fast, dark) & laser tracker (position) \\
+V1\_01\_easy, V2\_01\_easy & Vicon room & easy & motion capture (pose) \\
+V1\_02\_medium, V2\_02\_medium & Vicon room & medium & motion capture (pose) \\
+V1\_03\_difficult, V2\_03\_difficult & Vicon room & difficult (fast, blur) & motion capture (pose) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+MH\_01\_easy is the project's development sequence. The difficult sequences contain fast rotations, motion blur and poorly lit
+regions; they are where robust front ends and consistent estimators make the difference.

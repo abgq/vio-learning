@@ -1,0 +1,144 @@
+\chapter{From EKF-SLAM to the MSCKF}
+\label{ch:msckfintro}
+
+\begin{objectives}
+\begin{itemize}
+  \item Understand how EKF-SLAM uses visual landmarks, and why it scales poorly.
+  \item Understand the central idea of the MSCKF: constraints between multiple past poses instead of landmarks.
+  \item See why past poses must be kept in the state, with their correlations.
+  \item Relate the MSCKF to sliding-window optimization.
+\end{itemize}
+\end{objectives}
+
+% ------------------------------------------------------------------------------
+\section{EKF-SLAM}
+
+The most direct way to use a camera in an EKF is to put the landmarks in the state. With $L$ landmarks,
+\begin{equation}
+  x = \big(x_I,\ p_{f_1},\ \dots,\ p_{f_L}\big), \qquad \dim\delta x = 15 + 3L,
+\end{equation}
+and each image observation $z = \pi(p_c(x_I, p_{f_j})) + n$ is an ordinary EKF measurement of the IMU state and one
+landmark. This is EKF-SLAM, and MonoSLAM~\cite{davison2007monoslam} showed it can run in real time with a single camera.
+It has three structural problems.
+\begin{enumerate}
+  \item \textbf{Cost.} The covariance has $(15 + 3L)^2$ entries, and every update touches all of them. Tracking 200 landmarks
+        gives a $615\times615$ covariance; updating it at 20~Hz with hundreds of observations per frame is expensive, and the cost
+        grows quadratically with the map.
+  \item \textbf{Initialization.} A single monocular observation says nothing about depth. A new landmark must be
+        initialized with a huge depth uncertainty, which is highly non-Gaussian in Euclidean coordinates, or its
+        initialization must be delayed until it has been seen from several viewpoints. Inverse-depth
+        parameterizations~\cite{civera2008inverse} help, but add complexity.
+  \item \textbf{Housekeeping.} Landmarks that leave the field of view must either stay in the state, growing it, or be
+        marginalized, which in covariance form is cheap but discards their future value.
+\end{enumerate}
+
+% ------------------------------------------------------------------------------
+\section{The multi-state constraint}
+
+Consider a feature observed in $M$ images taken at times $t_1, \dots, t_M$. Each observation constrains the pose at its
+time and the feature position. Taken together, after the unknown feature position is eliminated, the $2M$ observations
+impose $2M - 3$ constraints \emph{on the $M$ poses alone}. This is the \emph{multi-state constraint}: geometric information
+about how the camera moved between the images, with the scene point serving only as an intermediary.
+
+\begin{keyidea}[the MSCKF in one sentence]
+Keep a sliding window of past poses in the state instead of landmarks; when a feature track is complete,
+triangulate it, linearize its observations, and eliminate the feature by projecting onto the left nullspace of its
+Jacobian, leaving a residual that depends only on the poses; then update.
+\end{keyidea}
+
+Mourikis and Roumeliotis~\cite{mourikis2007msckf} showed that this uses all the information that the observations carry about
+the poses (under linearization), at a cost linear in the number of features. Feature positions are never part of the
+state, so there is no landmark initialization problem inside the filter, and features leaving the view simply trigger an
+update.
+
+\section{Why past poses must be in the state}
+
+Why not keep only the current IMU state and use the constraint between the current pose and the past ones? Because the
+past poses are \emph{estimated} quantities, with errors correlated with the current state's error: they were all produced by
+the same propagation from the same measurements. A measurement relating the current pose to a past pose estimate, which
+treats that past estimate as fixed or independent, double counts information and makes the filter overconfident.
+
+The cure is \emph{stochastic cloning}~\cite{roumeliotis2002cloning}. When an image is captured, a copy of the current pose (a
+clone) is appended to the state, together with its exact correlations to everything else. From then on the clone is a
+state variable whose estimate can be corrected by later measurements, and whose correlation with the evolving IMU state is
+propagated exactly. \Cref{ch:cloning} develops this in detail.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[scale=1.0]
+  % trajectory
+  \draw[->, thick, black!50] (-0.5,-0.2) .. controls (2,0.6) and (5,0.7) .. (9.4,0.1) node[right, font=\footnotesize] {time};
+  % clones
+  \foreach \x/\y/\a/\n in {0.3/0.02/12/1, 1.8/0.33/9/2, 3.3/0.5/5/3, 4.8/0.56/0/4, 6.3/0.5/-5/5, 7.8/0.33/-10/6} {
+    \begin{scope}[shift={(\x,\y)}, rotate=\a]
+      \draw[fill=primarylight, draw=primary] (-0.2,0) -- (0.2,0) -- (0.3,0.42) -- (-0.3,0.42) -- cycle;
+    \end{scope}
+    \node[font=\scriptsize, below=2pt] at (\x,\y) {$C_\n$};
+  }
+  % current IMU
+  \fill[conv] (9.0,0.15) circle (2.5pt) node[below=3pt, font=\scriptsize] {IMU state};
+  % features
+  \coordinate (F1) at (2.4,3.2); \coordinate (F2) at (5.6,3.6); \coordinate (F3) at (7.6,2.9);
+  \fill[plotgreen] (F1) circle (2.3pt) node[above] {\footnotesize $f_1$};
+  \fill[plotgreen] (F2) circle (2.3pt) node[above] {\footnotesize $f_2$};
+  \fill[plotgreen] (F3) circle (2.3pt) node[above] {\footnotesize $f_3$};
+  \foreach \x/\y in {0.3/0.44, 1.8/0.75, 3.3/0.92} \draw[plotgreen, dashed] (\x,\y) -- (F1);
+  \foreach \x/\y in {3.3/0.92, 4.8/0.98, 6.3/0.92, 7.8/0.75} \draw[plotgreen!60!black, dashed] (\x,\y) -- (F2);
+  \foreach \x/\y in {6.3/0.92, 7.8/0.75} \draw[plotorange, dashed] (\x,\y) -- (F3);
+  \draw[decorate, decoration={brace, amplitude=5pt, mirror}] (0,-0.55) -- (8.1,-0.55) node[midway, below=6pt, font=\footnotesize] {sliding window of $N$ clones (poses at image times), all in the state};
+\end{tikzpicture}
+\caption{The MSCKF state: the current IMU state plus clones of past camera poses. Feature $f_1$ is seen by clones 1--3
+and constrains them; $f_2$ by clones 3--6. Neither feature is in the state. Feature $f_3$ has only two observations so far
+and keeps being tracked.}
+\label{fig:msckf-window}
+\end{figure}
+
+% ------------------------------------------------------------------------------
+\section{The MSCKF state}
+
+The project's state (AGENTS.md C3) is the IMU state plus $N \le$ \code{kMaxClones} clones, each holding the IMU pose
+$(p_{wb}, q_{wb})$ at an image timestamp:
+\begin{equation}
+  x = \big(\,p,\ v,\ q,\ b_a,\ b_g,\ \ p_1, q_1,\ \dots,\ p_N, q_N\,\big),\qquad \dim\delta x = 15 + 6N .
+\end{equation}
+The camera pose of clone $i$ is derived through the fixed extrinsics,
+$R_{wc_i} = R_{wb_i}R_{bc}$ and $p_{wc_i} = p_{wb_i} + R_{wb_i}p_{bc}$. With \code{kMaxClones} $= 10$, the error state has 75
+dimensions, independent of how many features are tracked.
+
+% ------------------------------------------------------------------------------
+\section{Relation to sliding-window optimization}
+
+Optimization-based VIO (OKVIS~\cite{leutenegger2015okvis}, VINS-Mono~\cite{qin2018vins}) keeps a similar window of poses and
+minimizes the sum of squared reprojection and IMU residuals over poses \emph{and} landmarks, relinearizing at every
+iteration, then marginalizes old states into a Gaussian prior. The MSCKF update is equivalent to a single Gauss--Newton
+iteration of such a problem, with the landmarks eliminated by a Schur complement and the prior given by the filter's
+covariance. Eliminating a landmark by nullspace projection and by Schur complement give the same information about the
+poses (\cref{thm:nullspace-optimal}). The differences are that the MSCKF never relinearizes past measurements, and
+processes each feature track exactly once, which makes it cheaper and more predictable, at some cost in accuracy under
+strong nonlinearity.
+
+\section{Variants}
+
+The basic MSCKF has been refined in many directions. MSCKF 2.0~\cite{li2013msckf2} added First-Estimates Jacobians for
+consistency and online calibration of extrinsics and time offset. Hybrid filters keep long-lived features in the state as
+SLAM landmarks while processing short tracks MSCKF-style. MSCKF-VIO~\cite{sun2018msckfvio} uses a stereo camera and
+two-point RANSAC for fast flight, and OpenVINS~\cite{geneva2020openvins} is a modular research platform that implements most of
+these options and documents them carefully.
+
+\begin{takeaways}
+\begin{itemize}
+  \item EKF-SLAM keeps landmarks in the state; its cost grows quadratically with the map.
+  \item The MSCKF keeps past poses (clones) instead; each feature track is turned into constraints on those poses.
+  \item Past poses must be in the state, with their correlations, or information is double counted.
+  \item The MSCKF update is equivalent to one Gauss--Newton step of sliding-window bundle adjustment with landmarks
+        marginalized.
+\end{itemize}
+\end{takeaways}
+
+\begin{exercises}
+  \item Estimate the memory and the per-update flop count of EKF-SLAM with 200 landmarks and of the MSCKF with 10 clones.
+  \item A feature is observed in $M$ images. How many scalar constraints does it impose on the poses? Why does the count
+        start being useful only at $M = 2$, and why does the project require $M \ge 3$?
+  \item Explain in your own words why using a past pose estimate as if it were known exactly makes the filter
+        overconfident. Construct a scalar example.
+\end{exercises}

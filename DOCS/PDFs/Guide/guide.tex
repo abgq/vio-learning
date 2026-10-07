@@ -1,0 +1,135 @@
+% ==============================================================================
+%  From Zero to MSCKF -- Lecture Notes on Visual-Inertial Odometry
+%
+%  Build:  .\build.ps1                (figures + both PDF editions)
+%  Manual: pdflatex guide.tex  (x3)   -> edition with worked solutions
+%          pdflatex -jobname=guide-nosolutions "\def\NoSolutions{}\input{guide.tex}"
+% ==============================================================================
+\documentclass[11pt, a4paper, oneside, openany]{book}
+\input{preamble}
+
+\begin{document}
+
+% ------------------------------------------------------------------ title page
+\frontmatter
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+\begin{tikzpicture}[remember picture, overlay]
+  \fill[primary] (current page.north west) rectangle ([yshift=-8.2cm]current page.north east);
+  \fill[primary!75!black] ([yshift=-8.2cm]current page.north west) rectangle ([yshift=-8.45cm]current page.north east);
+  % a stylised sliding window of camera clones observing a landmark
+  \begin{scope}[shift={([xshift=-5.6cm, yshift=-6.6cm]current page.north east)}, white, line width=0.7pt]
+    \foreach \x/\y/\a in {0/0/10, 1.15/0.35/18, 2.3/0.55/26, 3.45/0.6/34} {
+      \begin{scope}[shift={(\x,\y)}, rotate=\a]
+        \draw[fill=white, fill opacity=0.15] (0,0) -- (0.32,0.5) -- (-0.32,0.5) -- cycle;
+      \end{scope}
+    }
+    \fill[white] (1.9,3.6) circle (2.2pt);
+    \foreach \x/\y/\a in {0/0/10, 1.15/0.35/18, 2.3/0.55/26, 3.45/0.6/34}
+      \draw[white, dashed, opacity=0.8] (\x,\y) ++(\a+90:0.45) -- (1.9,3.6);
+    \draw[white, ->, opacity=0.9] (-0.4,-0.45) .. controls (1.3,0.1) and (2.5,0.3) .. (4.2,0.15);
+  \end{scope}
+  \node[anchor=north west, text=white, align=left] at ([xshift=2.3cm, yshift=-2.0cm]current page.north west)
+    {\fontsize{38}{44}\selectfont\bfseries From Zero to MSCKF};
+  \node[anchor=north west, text=white!88!primary, align=left] at ([xshift=2.35cm, yshift=-3.65cm]current page.north west)
+    {\Large Lecture Notes on Visual-Inertial Odometry};
+  \node[anchor=north west, text=white!75!primary, align=left, font=\large\itshape] at ([xshift=2.35cm, yshift=-4.6cm]current page.north west)
+    {Lie theory $\cdot$ error-state Kalman filtering $\cdot$ multi-view geometry\\[2pt]
+     $\cdot$ the Multi-State Constraint Kalman Filter};
+\end{tikzpicture}
+
+\vspace*{8.4cm}
+\begin{minipage}{0.92\textwidth}
+\large
+These notes develop monocular visual-inertial odometry from first principles. They start with the
+linear algebra, probability and rotation geometry that state estimation is built on, develop
+calculus on the rotation group $\SO$, derive the error-state Kalman filter for an inertial
+navigation system, build the geometric computer-vision front end, and assemble everything into
+the Multi-State Constraint Kalman Filter (MSCKF) evaluated on the EuRoC MAV benchmark.
+
+\medskip
+Every convention matches the frozen specification of the \texttt{vio} project
+(\texttt{AGENTS.md}): Hamilton quaternions, body-to-world attitude $q_{wb}$, and
+\emph{local (right) perturbations} in every Jacobian.
+\end{minipage}
+
+\vfill
+\begin{tcolorbox}[enhanced, colback=primarylight, colframe=primary, boxrule=0.6pt, arc=1mm, width=\textwidth]
+\small\textbf{Edition.}
+\ifsolutions
+This edition \emph{includes} the worked solutions of the project derivation exercises
+(\cref{app:solutions}). If you intend to derive $F_c$, $G_c$, $H$ and the cloning Jacobian $J$
+yourself (Guardrail 4 of \texttt{AGENTS.md}), attempt each \emph{Derivation exercise} box before
+turning to the appendix, then verify your answer numerically.
+\else
+This edition \emph{omits} the worked solutions of the project derivation exercises, so that
+$F_c$, $G_c$, $H$ and the cloning Jacobian $J$ are yours to derive (Guardrail 4 of
+\texttt{AGENTS.md}). Each \emph{Derivation exercise} box gives the method, hints and a numerical
+test that tells you when you are right.
+\fi
+\end{tcolorbox}
+
+\vspace{6mm}
+{\large Course notes for the \texttt{vio} project \hfill \today}
+\end{titlepage}
+\hypersetup{pageanchor=true}
+
+\include{chapters/00_preface}
+
+\tableofcontents
+
+% ------------------------------------------------------------------ main matter
+\mainmatter
+
+\part{Mathematical Foundations}
+\include{chapters/01_introduction}
+\include{chapters/02_linear_algebra}
+\include{chapters/03_probability}
+\include{chapters/04_rotations}
+\include{chapters/05_lie_theory}
+
+\part{Estimation Theory}
+\include{chapters/06_kalman_filter}
+\include{chapters/07_eskf}
+
+\part{Inertial Navigation}
+\include{chapters/08_imu}
+\include{chapters/09_strapdown}
+\include{chapters/10_error_dynamics}
+
+\part{The Error-State Filter in Practice}
+\include{chapters/11_updates}
+\include{chapters/12_consistency}
+
+\part{Geometric Computer Vision}
+\include{chapters/13_camera}
+\include{chapters/14_multiview}
+\include{chapters/15_frontend}
+
+\part{The Multi-State Constraint Kalman Filter}
+\include{chapters/16_msckf_intro}
+\include{chapters/17_cloning}
+\include{chapters/18_msckf_update}
+\include{chapters/19_full_algorithm}
+
+\part{Beyond the Baseline}
+\include{chapters/20_observability}
+\include{chapters/21_engineering}
+
+% ------------------------------------------------------------------ appendices
+\appendix
+\crefalias{chapter}{appendix}
+\crefalias{section}{subappendix}
+\part*{Appendices} % titlesec adds the TOC entry for starred parts
+\include{appendices/A_notation}
+\include{appendices/B_formulas}
+\include{appendices/C_tables}
+\include{appendices/D_euroc}
+\ifsolutions
+\include{appendices/E_solutions}
+\fi
+
+\backmatter
+\include{chapters/references}
+
+\end{document}

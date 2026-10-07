@@ -1,0 +1,249 @@
+\chapter{Inertial Sensors and Their Errors}
+\label{ch:imu}
+
+\begin{objectives}
+\begin{itemize}
+  \item Understand what MEMS accelerometers and gyroscopes physically measure, especially specific force.
+  \item State the IMU measurement model of the project and the role of each term.
+  \item Know the main IMU error sources and which ones the filter models.
+  \item Convert between continuous-time noise densities, discrete per-sample noise, and datasheet units.
+  \item Read an Allan deviation plot and use it to identify noise parameters.
+\end{itemize}
+\end{objectives}
+
+% ------------------------------------------------------------------------------
+\section{How MEMS inertial sensors work}
+
+A MEMS (micro-electro-mechanical system) \textbf{accelerometer} is a tiny proof mass suspended on silicon
+springs. When the case accelerates, the springs must deflect to drag the mass along. The deflection,
+measured capacitively, is proportional to the force the springs exert per unit mass. A MEMS
+\textbf{gyroscope} keeps a proof mass vibrating along one axis. When the sensor rotates, the Coriolis
+force $-2m\,\omega\times\dot r$ pushes the mass along a perpendicular axis with an amplitude proportional to the
+angular rate, and that secondary motion is measured. A six-axis IMU packages three of each, nominally
+orthogonal, with electronics that filter, sample and timestamp the signals.
+
+\section{Specific force: what an accelerometer measures}
+
+Newton's second law for the proof mass $m$ in an inertial frame reads
+\begin{equation}
+  m\,a = F_{\text{spring}} + m\,g,
+\end{equation}
+where $a$ is the acceleration of the mass (equal to that of the case once transients settle) and $g$ is the
+gravitational acceleration. The sensor measures the spring force, i.e.\ the \emph{specific force}
+\begin{equation}
+  f = \frac{F_{\text{spring}}}{m} = a - g .
+\end{equation}
+Gravity acts on the mass and the case equally and cannot be felt directly: this is Einstein's equivalence
+principle. Two cases build intuition.
+\begin{itemize}
+  \item \textbf{At rest on a table}, $a = 0$, so $f = -g$. With $g_w = [0, 0, -9.81]\T$, the accelerometer reads
+        $+9.81~\mathrm{m/s^2}$ \emph{upward}: it senses the table pushing it up.
+  \item \textbf{In free fall}, $a = g$, so $f = 0$. A falling IMU reads zero, whatever its velocity.
+\end{itemize}
+To recover the kinematic acceleration from the measurement, the estimator rotates the specific force into
+the world frame and \emph{adds gravity back}: $a_w = R_{wb}f_b + g_w$. A sign error here produces a vertical
+acceleration error of $2g \approx 20~\mathrm{m/s^2}$ and an obviously diverging altitude, which is
+fortunately easy to recognize.
+
+% ------------------------------------------------------------------------------
+\section{The measurement model}
+
+\begin{convention}[IMU model, AGENTS.md C6]
+\begin{equation}
+  \omega_m = \omega_b + b_g + n_g, \qquad
+  a_m = R_{wb}\T\big(a_w - g_w\big) + b_a + n_a, \qquad
+  \dot b_g = n_{b_g}, \quad \dot b_a = n_{b_a},
+  \label{eq:imu-model}
+\end{equation}
+with $\omega_m$, $a_m$ the gyroscope and accelerometer readings in the body frame, $\omega_b$ the true angular rate,
+$a_w$ the true acceleration of the body in the world frame, $b_g$, $b_a$ the biases (body frame), and
+$n_g, n_a, n_{b_g}, n_{b_a}$ zero-mean white noises with densities $\sigma_g, \sigma_a, \sigma_{b_g}, \sigma_{b_a}$. The noise
+vector is ordered $w = [n_a, n_g, n_{b_a}, n_{b_g}] \in \R^{12}$.
+\end{convention}
+
+The model has two kinds of error. \emph{White noise} ($n_g$, $n_a$) is independent from sample to sample and
+averages out. \emph{Bias} ($b_g$, $b_a$) is a slowly varying offset that does not average out and is
+therefore estimated as part of the state. Its slow drift is modeled as a random walk driven by
+$n_{b_g}$, $n_{b_a}$. Over the minutes of a EuRoC sequence the biases change little but measurably.
+
+% ------------------------------------------------------------------------------
+\section{Error sources}
+
+\begin{table}[t]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}l X l@{}}
+\toprule
+\textbf{Error} & \textbf{Description} & \textbf{In the model?} \\
+\midrule
+White noise & sample-to-sample electronic and thermo-mechanical noise (angle/velocity random walk) & yes, $n_g$, $n_a$ \\
+Turn-on bias & constant offset that differs at each power-up & yes, initial $b$ and $P_0$ \\
+In-run bias drift & slow wandering of the offset & yes, random walk \\
+Bias instability & flicker ($1/f$) noise floor of the bias & approximated by the random walk \\
+Scale factor & output $= (1 + s)\times$ input & no \\
+Axis misalignment & sensing axes not exactly orthogonal / aligned with the case & no \\
+$g$-sensitivity & gyro output depends on acceleration & no \\
+Temperature effects & bias and scale factor change with temperature & no (absorbed by bias walk) \\
+Quantization & finite resolution of the ADC & no (below white noise) \\
+Saturation, vibration & clipping on impacts; aliasing of high-frequency vibration & no \\
+Earth rotation & gyros sense $7.3\times10^{-5}$~rad/s & no (\cref{ch:rotations}) \\
+\bottomrule
+\end{tabularx}
+\caption{IMU error sources and how the project's model treats them.}
+\label{tab:imu-errors}
+\end{table}
+
+\Cref{tab:imu-errors} lists the main error sources. Unmodeled errors do not disappear: they appear as
+apparent extra noise or apparent bias drift. A filter that ignores them must compensate with larger noise
+parameters than the white-noise floor alone would suggest, which is why tuning is needed even with a
+well-calibrated sensor. High-accuracy systems estimate scale factors and misalignments too, and EuRoC's
+calibration with Kalibr~\cite{furgale2013kalibr} removes most static misalignment beforehand.
+
+% ------------------------------------------------------------------------------
+\section{Noise parameters and their units}
+
+The noise densities are continuous-time quantities (\cref{sec:ct-noise}). For EuRoC's ADIS16448, the
+\code{imu0/sensor.yaml} file gives the values in \cref{tab:euroc-imu}.
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}l l l l@{}}
+\toprule
+YAML key & Symbol & Value & Units \\
+\midrule
+\code{gyroscope\_noise\_density} & $\sigma_g$ & $1.6968\times10^{-4}$ & $\mathrm{rad/s/\sqrt{Hz}}$ \\
+\code{accelerometer\_noise\_density} & $\sigma_a$ & $2.0\times10^{-3}$ & $\mathrm{m/s^2/\sqrt{Hz}}$ \\
+\code{gyroscope\_random\_walk} & $\sigma_{b_g}$ & $1.9393\times10^{-5}$ & $\mathrm{rad/s^2/\sqrt{Hz}}$ \\
+\code{accelerometer\_random\_walk} & $\sigma_{b_a}$ & $3.0\times10^{-3}$ & $\mathrm{m/s^3/\sqrt{Hz}}$ \\
+\code{rate\_hz} & $1/\Dt$ & 200 & Hz \\
+\bottomrule
+\end{tabular}
+\caption{EuRoC IMU noise parameters (\code{imu0/sensor.yaml}). Verify against your copy of the dataset.}
+\label{tab:euroc-imu}
+\end{table}
+
+The units follow from the definitions. A gyro rate in rad/s with a white noise density has units
+$\mathrm{rad/s}\cdot\sqrt{\mathrm{s}} = \mathrm{rad/s/\sqrt{Hz}}$. A gyro bias random walk is the integral of white
+noise with units of $\mathrm{rad/s^2}$, so its density is in $\mathrm{rad/s^2/\sqrt{Hz}}$, and after $t$ seconds the
+bias has standard deviation $\sigma_{b_g}\sqrt t$ in rad/s.
+
+\paragraph{Discrete equivalents.} At sample period $\Dt$:
+\begin{equation}
+  \sigma_{g,d} = \frac{\sigma_g}{\sqrt\Dt}, \qquad \sigma_{a,d} = \frac{\sigma_a}{\sqrt\Dt}, \qquad
+  \sigma_{b_g,d} = \sigma_{b_g}\sqrt\Dt, \qquad \sigma_{b_a,d} = \sigma_{b_a}\sqrt\Dt .
+\end{equation}
+For EuRoC: $\sigma_{g,d} = 2.4\times10^{-3}$~rad/s per sample, $\sigma_{a,d} = 2.8\times10^{-2}~\mathrm{m/s^2}$ per sample,
+and the gyro bias diffuses by $1.4\times10^{-6}$~rad/s per sample. In the filter you never need these
+directly, because $Q_d = G_cQ_cG_c\T\Dt$ uses the densities, but they are what a synthetic data generator must
+add to each sample.
+
+\paragraph{Datasheet units.} Manufacturers often quote angle random walk (ARW) in
+$^\circ/\sqrt{\mathrm{h}}$ and velocity random walk (VRW) in $\mathrm{m/s/\sqrt{h}}$. Since
+$1\ ^\circ/\sqrt{\mathrm{h}} = \frac{\pi/180}{60}~\mathrm{rad/\sqrt{s}} = 2.909\times10^{-4}~\mathrm{rad/s/\sqrt{Hz}}$, EuRoC's
+$\sigma_g$ is an ARW of $0.58\ ^\circ/\sqrt{\mathrm{h}}$, and its $\sigma_a$ is a VRW of $0.12~\mathrm{m/s/\sqrt{h}}$.
+Bias instability is quoted in $^\circ/\mathrm{h}$ and is \emph{not} the same thing as the random walk density.
+
+% ------------------------------------------------------------------------------
+\section{The Allan variance}
+\label{sec:allan}
+
+How are these parameters measured? Record the sensor at rest for a few hours, then compute the
+\emph{Allan variance}. Split the record of rate samples into clusters of duration $\tau$, average each
+cluster to get $\bar\omega_k(\tau)$, and compute half the mean squared difference of consecutive cluster
+averages:
+\begin{equation}
+  \sigma_A^2(\tau) = \tfrac12\,\E\big[(\bar\omega_{k+1}(\tau) - \bar\omega_k(\tau))^2\big].
+\end{equation}
+Each noise process has a characteristic signature on a log-log plot of the Allan deviation
+$\sigma_A(\tau)$:
+\begin{center}\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+Process & $\sigma_A^2(\tau)$ & slope of $\sigma_A$ \\
+\midrule
+quantization noise & $3Q^2/\tau^2$ & $-1$ \\
+white noise (density $\sigma$) & $\sigma^2/\tau$ & $-\tfrac12$ \\
+bias instability ($B$) & $\approx (0.664 B)^2$ & $0$ \\
+bias random walk (density $\sigma_b$) & $\sigma_b^2\tau/3$ & $+\tfrac12$ \\
+rate ramp ($R$) & $R^2\tau^2/2$ & $+1$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+White noise is read off the $-\tfrac12$ line at $\tau = 1$~s, and the random walk density off the $+\tfrac12$ line
+at $\tau = 3$~s. The minimum of the curve marks the averaging time beyond which a stationary sensor's
+bias starts to wander, and its height is related to the bias instability.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{fig_allan.pdf}
+  \caption{Allan deviation of a simulated 4-hour static recording with EuRoC's noise parameters. The
+  $-\tfrac12$ slope of white noise dominates short averaging times and the $+\tfrac12$ slope of the bias random
+  walk dominates long ones. Reading the asymptotes at $\tau = 1$~s and $\tau = 3$~s recovers the
+  densities.}
+  \label{fig:allan}
+\end{figure}
+
+\Cref{fig:allan} shows the procedure on simulated data. Real sensors add a flat bias-instability region
+near the minimum, which the random-walk model only approximates. The IEEE standard
+procedure~\cite{ieee952} and El-Sheimy et al.~\cite{elsheimy2008allan} give details.
+
+% ------------------------------------------------------------------------------
+\section{Tuning in practice}
+
+The densities from an Allan analysis describe a stationary sensor in a quiet lab. On a flying vehicle,
+vibration, temperature changes, scale-factor and misalignment errors, timing jitter and integration error
+all add to the effective noise. Common practice is to start from the Allan values (or the dataset's values)
+and inflate them by a modest factor until the filter is consistent, as judged by the statistical tests of
+\cref{ch:consistency}. Two rules keep tuning honest.
+\begin{enumerate}
+  \item \textbf{Change physically meaningful parameters only}, and keep them within a plausible range of
+        their measured values.
+  \item \textbf{Judge on consistency statistics} (NEES on synthetic data, NIS and $3\sigma$ coverage on real data),
+        not on trajectory error alone. Tuning for the lowest trajectory error on the test sequence is
+        overfitting.
+\end{enumerate}
+
+\begin{pitfall}[mixing up the two discretizations]
+The white-noise variance per sample is $\sigma^2/\Dt$ (larger at higher rate), while the random-walk variance per
+step is $\sigma_b^2\Dt$ (smaller at higher rate). Swapping them is a common bug in synthetic data generators,
+and it produces noise that is wrong by a factor of $1/\Dt^2 = 40\,000$ at 200~Hz.
+\end{pitfall}
+
+\section{The EuRoC IMU stream}
+
+EuRoC's \code{imu0/data.csv} contains one row per sample: \code{timestamp [ns], w\_x, w\_y, w\_z [rad/s],
+a\_x, a\_y, a\_z [m/s\textsuperscript{2}]}, i.e.\ $\omega_m$ and $a_m$ in $B$ (AGENTS.md C7). Samples arrive at
+nominally 200~Hz, hardware-synchronized with the cameras. The filter must nevertheless take $\Dt$ from
+consecutive timestamps (AGENTS.md C5): real data has jitter and occasional gaps, which Milestone 3 logs.
+The ground-truth file starts later than the IMU file, so the filter is initialized at the first
+ground-truth sample at or after the stream start.
+
+\begin{projectlink}[Milestones 3 and 4]
+M3 parses \code{sensor.yaml} into exactly the parameters of \cref{tab:euroc-imu} and builds the event stream.
+M4's synthetic trajectory generator produces noise-free IMU data from \eqref{eq:imu-model}; adding
+noise with the discrete equivalents above turns it into the Monte Carlo generator of M5.
+\end{projectlink}
+
+\begin{takeaways}
+\begin{itemize}
+  \item An accelerometer measures specific force $f = a - g$: it reads $+g$ upward at rest and zero in free fall.
+  \item $\omega_m = \omega_b + b_g + n_g$ and $a_m = R_{wb}\T(a_w - g_w) + b_a + n_a$, with random-walk biases.
+  \item Noise densities have units of $[u]/\sqrt{\mathrm{Hz}}$; per-sample white noise is $\sigma/\sqrt\Dt$, per-step bias
+        diffusion is $\sigma_b\sqrt\Dt$.
+  \item The Allan deviation identifies white noise (slope $-\tfrac12$, read at 1~s) and bias random walk (slope
+        $+\tfrac12$, read at 3~s).
+  \item Unmodeled errors force noise inflation; tune on consistency, not on accuracy.
+\end{itemize}
+\end{takeaways}
+
+\begin{exercises}
+  \item An IMU lies on a table tilted by $10^\circ$ about its $x$-axis. Compute the ideal accelerometer reading.
+        Which component reveals the tilt, and with what sign?
+  \item A gyroscope datasheet gives ARW $= 0.2\ ^\circ/\sqrt{\mathrm{h}}$. Convert it to
+        $\mathrm{rad/s/\sqrt{Hz}}$ and to the per-sample standard deviation at 400~Hz.
+  \item Simulate 2 hours of a gyro with EuRoC parameters, compute the overlapping Allan deviation, and recover
+        $\sigma_g$ and $\sigma_{b_g}$ from the asymptotes. How long a recording do you need to estimate $\sigma_{b_g}$ to 10\%?
+  \item Show that the Allan variance of white noise with density $\sigma$ is $\sigma^2/\tau$, and of a random walk with
+        density $\sigma_b$ is $\sigma_b^2\tau/3$.
+  \item A scale-factor error of $s = 10^{-3}$ affects a gyro on a vehicle spinning at 1~rad/s. What equivalent bias
+        does it produce? Why can't a constant-bias model absorb it during maneuvers?
+\end{exercises}

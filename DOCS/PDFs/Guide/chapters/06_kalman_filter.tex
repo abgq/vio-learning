@@ -1,0 +1,320 @@
+\chapter{The Kalman Filter}
+\label{ch:kf}
+
+\begin{objectives}
+\begin{itemize}
+  \item Derive the Kalman filter from Bayes' rule and Gaussian conditioning, in a few lines.
+  \item Understand the gain, the innovation and its covariance, and the several equivalent forms of
+        the covariance update.
+  \item Know why the Joseph form is used and how to implement the update without explicit inverses.
+  \item Discretize a continuous-time linear stochastic system exactly and approximately, including Van
+        Loan's method.
+\end{itemize}
+\end{objectives}
+
+Rudolf Kálmán's 1960 paper~\cite{kalman1960} gave a recursive solution to linear estimation that
+needs only the current estimate and covariance. It flew on Apollo and remains the backbone of
+navigation. This chapter derives it for linear systems. \Cref{ch:eskf} extends it to the nonlinear,
+manifold-valued state of VIO.
+
+% ------------------------------------------------------------------------------
+\section{Linear-Gaussian state-space models}
+
+A discrete-time linear system with Gaussian noise is described by
+\begin{align}
+  x_k &= \Phi_{k}\, x_{k-1} + w_k, & w_k &\sim \N(0, Q_k), \label{eq:lin-process}\\
+  z_k &= H_k\, x_k + n_k, & n_k &\sim \N(0, R_k), \label{eq:lin-meas}
+\end{align}
+with $x_0 \sim \N(\hat x_0, P_0)$, and with $x_0$, $\{w_k\}$ and $\{n_k\}$ mutually independent and white.
+$\Phi_k$ is the state transition matrix, $Q_k$ the process noise covariance, $H_k$ the measurement
+matrix and $R_k$ the measurement noise covariance. The goal is the posterior $p(x_k \mid z_{1:k})$
+given all measurements up to time $k$.
+
+% ------------------------------------------------------------------------------
+\section{The Bayes filter}
+
+Because the state is Markov (given $x_{k-1}$, the past does not influence $x_k$) and each measurement
+depends only on the current state, the posterior can be computed recursively in two steps:
+\begin{align}
+  \textbf{predict:}&\quad p(x_k \mid z_{1:k-1}) = \int p(x_k \mid x_{k-1})\, p(x_{k-1}\mid z_{1:k-1})\,\dd x_{k-1}, \\
+  \textbf{update:}&\quad p(x_k \mid z_{1:k}) \propto p(z_k \mid x_k)\, p(x_k \mid z_{1:k-1}).
+\end{align}
+For a linear-Gaussian model all of these densities are Gaussian, so each step reduces to updating a mean
+and a covariance. We write $\hat x_k^-$, $P_k^-$ for the predicted (prior) moments and $\hat x_k^+$, $P_k^+$ for
+the updated (posterior) moments.
+
+% ------------------------------------------------------------------------------
+\section{Derivation}
+
+\subsection{Prediction}
+
+By \cref{prop:affine} applied to \eqref{eq:lin-process}, with $x_{k-1}$ and $w_k$ independent,
+\begin{equation}
+  \hat x_k^- = \Phi_k\,\hat x_{k-1}^+, \qquad P_k^- = \Phi_k P_{k-1}^+\Phi_k\T + Q_k .
+  \label{eq:kf-predict}
+\end{equation}
+Prediction never decreases uncertainty in the directions excited by $Q_k$: it moves the error with the
+dynamics and adds process noise.
+
+\subsection{Update}
+
+Before the measurement arrives, the state and the measurement are jointly Gaussian. From
+\eqref{eq:lin-meas}, dropping the time index,
+\begin{equation}
+  \begin{bmatrix} x \\ z \end{bmatrix} \sim \N\!\left(
+    \begin{bmatrix} \hat x^- \\ H\hat x^- \end{bmatrix},
+    \begin{bmatrix} P^- & P^-H\T \\ HP^- & HP^-H\T + R \end{bmatrix} \right).
+\end{equation}
+Conditioning on the observed $z$ with \cref{thm:gauss-cond} gives the update directly.
+
+\begin{theorem}[Kalman update]
+\label{thm:kf-update}
+Define the \emph{innovation} (residual) $r = z - H\hat x^-$, its covariance $S = HP^-H\T + R$, and the
+\emph{Kalman gain} $K = P^-H\T S\inv$. Then
+\begin{equation}
+  \hat x^+ = \hat x^- + K r, \qquad P^+ = P^- - K S K\T = (I - KH)\,P^- .
+  \label{eq:kf-update}
+\end{equation}
+\end{theorem}
+\begin{proof}
+\Cref{eq:gauss-cond} with $\Sigma_{ab} = P^-H\T$ and $\Sigma_{bb} = S$ gives
+$\hat x^+ = \hat x^- + P^-H\T S\inv(z - H\hat x^-)$ and $P^+ = P^- - P^-H\T S\inv HP^-$. Since
+$KSK\T = P^-H\T S\inv HP^- = KHP^-$, both covariance forms agree.
+\end{proof}
+
+\begin{keyidea}[the gain is a ratio of uncertainties]
+For a scalar state measured directly ($H = 1$), $K = \frac{P^-}{P^- + R}$ and
+$P^+ = \frac{P^- R}{P^- + R}$. If the prior is much more uncertain than the sensor ($P^- \gg R$), $K \to 1$
+and the estimate jumps to the measurement. If the sensor is much worse ($R \gg P^-$), $K \to 0$ and the
+measurement is nearly ignored. The posterior variance is always smaller than both. In general, $K$
+maps the innovation, which lives in measurement space, into a correction in state space, including
+corrections to states that are not measured directly but are correlated with measured ones through
+$P^-$. This is how a pose measurement corrects velocity and biases.
+\end{keyidea}
+
+\subsection{The information form}
+
+Applying the Woodbury identity (\cref{thm:woodbury}) to $P^+ = P^- - P^-H\T(HP^-H\T + R)\inv HP^-$ gives
+\begin{equation}
+  (P^+)\inv = (P^-)\inv + H\T R\inv H, \qquad K = P^+ H\T R\inv .
+  \label{eq:kf-info}
+\end{equation}
+Information adds: each independent measurement contributes $H\T R\inv H$. This is the form in which the
+MAP problem \eqref{eq:map-ls} is solved, which confirms that the Kalman update is its closed-form
+solution. The covariance form \eqref{eq:kf-update} inverts an $m\times m$ matrix ($m$ = measurement
+dimension); the information form inverts an $n\times n$ matrix ($n$ = state dimension). Filters use the
+former when $m < n$.
+
+% ------------------------------------------------------------------------------
+\section{Properties}
+
+\begin{proposition}[Optimality]
+For the linear-Gaussian model, $\hat x_k^+ = \E[x_k\mid z_{1:k}]$: the Kalman filter is the minimum
+mean-square error estimator among \emph{all} estimators, linear or not. If the noises are not
+Gaussian but have the stated means and covariances, it remains the best \emph{linear} unbiased
+estimator.
+\end{proposition}
+
+\begin{proposition}[Innovation properties]
+\label{prop:innovation}
+If the model is correct, the innovations $r_k$ are zero-mean, Gaussian, with covariance $S_k$, and
+uncorrelated across time. Consequently $r_k\T S_k\inv r_k \sim \chi^2_{m_k}$.
+\end{proposition}
+\begin{proof}[Sketch]
+$r_k = H_k(x_k - \hat x_k^-) + n_k$ is a linear combination of independent zero-mean Gaussians, with
+covariance $H_kP_k^-H_k\T + R_k = S_k$. Whiteness follows from the orthogonality principle: the
+estimation error is uncorrelated with all past measurements, hence with all past innovations.
+The $\chi^2$ statement is \cref{thm:mahalanobis-chi2}.
+\end{proof}
+
+\Cref{prop:innovation} is the most useful diagnostic in filtering, because it can be checked on real data
+without ground truth. The \emph{normalized innovation squared} (NIS) $r\T S\inv r$ should look like a
+$\chi^2_m$ sample. Values that are systematically too large mean the filter is overconfident or the model
+is wrong; systematically too small means it is underconfident. Gating (\cref{ch:updates}) uses the same
+statistic one measurement at a time.
+
+% ------------------------------------------------------------------------------
+\section{The Joseph form}
+\label{sec:joseph}
+
+\begin{proposition}[Joseph form]
+\label{prop:joseph}
+For \emph{any} gain $K$ (optimal or not), the error covariance after the update
+$\hat x^+ = \hat x^- + K(z - H\hat x^-)$ is
+\begin{equation}
+  P^+ = (I - KH)\,P^-\,(I - KH)\T + K R K\T .
+  \label{eq:joseph}
+\end{equation}
+For the optimal gain it equals $(I - KH)P^-$.
+\end{proposition}
+\begin{proof}
+The posterior error is $e^+ = x - \hat x^+ = (I - KH)(x - \hat x^-) - Kn$. Its two terms are independent,
+so by \cref{prop:affine} its covariance is \eqref{eq:joseph}. Expanding with $K = P^-H\T S\inv$:
+$(I-KH)P^-(I-KH)\T + KRK\T = (I-KH)P^- - (I-KH)P^-H\T K\T + KRK\T = (I-KH)P^- - P^-H\T K\T + K S K\T$,
+and the last two terms cancel because $KSK\T = P^-H\T K\T$.
+\end{proof}
+
+Why use the longer formula? In floating point, $(I - KH)P^-$ is the difference of two nearly equal
+matrices when the update is informative, and it is not symmetric. Rounding can push small eigenvalues
+negative, after which the filter is broken: variances become negative, Cholesky fails, gates misbehave.
+The Joseph form is a sum of a congruence of $P^-$ and a congruence of $R$, so by \cref{prop:psd} it is PSD
+whenever $P^-$ and $R$ are, regardless of rounding in $K$. It also remains correct when $K$ is
+deliberately suboptimal (for example, a gain computed with a slightly stale $P$). AGENTS.md F3 mandates
+it.
+
+\begin{implnote}[cost of the Joseph form]
+With $n$ states and $m$ measurements, $(I - KH)P(I-KH)\T$ costs $\mathcal{O}(n^3)$ if done naively. For the
+MSCKF ($n = 75$) this is fine. If it ever matters, note that the update can be rearranged as
+$P^+ = P - KHP - (KHP)\T + K S K\T$, which costs $\mathcal{O}(n^2 m)$ and is algebraically identical to the
+Joseph form for any gain. It no longer has the sum-of-congruences structure that guarantees positive
+semi-definiteness under rounding, though, so keep the symmetrization and monitor the smallest eigenvalue
+in tests. Profile before optimizing.
+\end{implnote}
+
+% ------------------------------------------------------------------------------
+\section{Implementing the update}
+
+\begin{algorithm}[t]
+\caption{Numerically careful Kalman update}
+\label{alg:kf-update}
+\begin{algorithmic}[1]
+\Require prior $(\hat x, P)$, measurement $z$, model $(H, R)$
+\State $r \gets z - H\hat x$ \Comment{innovation}
+\State $S \gets HPH\T + R$; \quad $S \gets \tfrac12(S + S\T)$
+\State $L \gets \mathrm{chol}(S)$ \Comment{or LDL$^\mathsf{T}$; failure means $S$ is not PD}
+\State $\gamma \gets \|L\inv r\|^2$ \Comment{NIS, for gating and logging}
+\If{$\gamma > \chi^2_{0.95}(\dim r)$} \State \Return reject (and count it) \EndIf
+\State solve $S\,K\T = HP$ for $K\T$ using $L$ \Comment{never form $S\inv$}
+\State $\hat x \gets \hat x + Kr$
+\State $P \gets (I - KH)P(I - KH)\T + KRK\T$; \quad $P \gets \tfrac12(P + P\T)$
+\end{algorithmic}
+\end{algorithm}
+
+\Cref{alg:kf-update} collects the numerical rules of the previous sections. Two details deserve
+comment. The gain is obtained by solving $SK\T = HP\T = HP$ (since $P$ is symmetric), so the Cholesky factor
+of $S$ is reused for both the gate and the gain. And symmetrization after each step removes the
+asymmetry that rounding introduces, which otherwise slowly accumulates (AGENTS.md F2).
+
+\paragraph{Sequential updates.} If $R$ is block-diagonal, the blocks of a stacked measurement are
+independent given $x$, and processing them one after another with intermediate updates gives exactly
+the same result as a single batch update. This can reduce cost (several small $S$ inversions instead of
+one large one) and allows per-block gating. If the blocks share errors (correlated $R$), sequential
+processing without accounting for the correlation is wrong.
+
+% ------------------------------------------------------------------------------
+\section{From continuous to discrete time}
+\label{sec:discretization}
+
+Physical systems, including the error dynamics of an inertial navigation system, are naturally written in
+continuous time:
+\begin{equation}
+  \dot x(t) = F_c\, x(t) + G_c\, w(t), \qquad \E[w(t)w(s)\T] = Q_c\,\delta(t - s),
+  \label{eq:ct-model}
+\end{equation}
+where $w$ is white noise with power spectral density $Q_c$ (\cref{sec:ct-noise}). Over a step of length
+$\Dt$ with $F_c$, $G_c$ constant, the solution is
+\begin{equation}
+  x(t + \Dt) = \underbrace{\exp(F_c\Dt)}_{\Phi}\, x(t) + \underbrace{\int_0^\Dt \exp(F_c s)\,G_c\,w(t + \Dt - s)\,\dd s}_{w_k},
+\end{equation}
+which is exactly of the form \eqref{eq:lin-process}. The discrete process noise is zero-mean Gaussian with
+covariance (by the same white-noise calculation as in \cref{prop:integrated-noise})
+\begin{equation}
+  Q_d = \int_0^\Dt \exp(F_c s)\, G_c Q_c G_c\T \exp(F_c s)\T\,\dd s .
+  \label{eq:qd-exact}
+\end{equation}
+
+\subsection{Approximations}
+
+Expanding to first order in $\Dt$ gives the approximations used by most real-time filters and frozen in
+AGENTS.md F2:
+\begin{equation}
+  \Phi \approx I + F_c\Dt, \qquad Q_d \approx G_c Q_c G_c\T\,\Dt .
+  \label{eq:disc-first-order}
+\end{equation}
+Both are accurate to $O(\Dt^2)$ per step. The units confirm \eqref{eq:disc-first-order}: a noise density
+$\sigma_a$ in $\mathrm{m/s^2/\sqrt{Hz}}$ gives $\sigma_a^2\Dt$ in $\mathrm{m^2/s^2}$, a velocity variance. A
+second-order option adds $\tfrac12F_c^2\Dt^2$ to $\Phi$ and
+$\tfrac12(F_cGQG\T + GQG\T F_c\T)\Dt^2$ to $Q_d$.
+
+\begin{example}[Double integrator]
+\label{ex:double-integrator-qd}
+For position and velocity driven by white acceleration of density $\sigma$, $F_c = \begin{bmatrix}0&1\\0&0\end{bmatrix}$,
+$G_c = \begin{bmatrix}0\\1\end{bmatrix}$, $Q_c = \sigma^2$. \Cref{ex:double-integrator} gives $\exp(F_cs)G_c = [s;\ 1]$, so
+\eqref{eq:qd-exact} evaluates exactly to
+\begin{equation}
+  Q_d = \sigma^2\begin{bmatrix} \Dt^3/3 & \Dt^2/2 \\ \Dt^2/2 & \Dt \end{bmatrix}.
+\end{equation}
+The first-order approximation $Q_d \approx \diag(0, \sigma^2\Dt)$ puts no noise on position within a single
+step. Yet after $n$ steps of exact $\Phi$, the accumulated position variance is
+$\sum_{k=1}^{n} (k\Dt)^2\sigma^2\Dt \to \sigma^2 t^3/3$ as $\Dt\to0$ (a Riemann sum), which is the exact
+answer of \cref{prop:integrated-noise}. The per-step error of the approximation does not accumulate into
+a wrong growth law; it only introduces an $O(\Dt)$ relative error, negligible at 200~Hz.
+\end{example}
+
+\subsection{Van Loan's method}
+
+When higher accuracy is wanted, \eqref{eq:qd-exact} can be computed exactly with a single matrix
+exponential~\cite{vanloan1978}.
+
+\begin{proposition}[Van Loan]
+\label{prop:vanloan}
+Let $C = \exp\!\Big(\begin{bmatrix} -F_c & G_cQ_cG_c\T \\ 0 & F_c\T \end{bmatrix}\Dt\Big)
+= \begin{bmatrix} C_{11} & C_{12} \\ 0 & C_{22}\end{bmatrix}$. Then $\Phi = C_{22}\T$ and $Q_d = \Phi\, C_{12}$.
+\end{proposition}
+\begin{proof}
+Block-triangular exponentials satisfy $C_{22} = \exp(F_c\T\Dt)$ and
+$C_{12} = \int_0^\Dt \exp(-F_c(\Dt - s))\,GQG\T\exp(F_c\T s)\,\dd s$ (verify by differentiating in $\Dt$).
+Multiplying by $\Phi = \exp(F_c\Dt)$ on the left and substituting $s\to\Dt-s$ gives \eqref{eq:qd-exact}.
+\end{proof}
+
+For the 15-state INS this costs a $30\times30$ matrix exponential per step, too expensive at 200~Hz but
+excellent as a test oracle for the closed forms of \cref{ch:errordyn}.
+
+% ------------------------------------------------------------------------------
+\section{A worked example}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{fig_kf1d.pdf}
+  \caption{A constant-velocity Kalman filter tracking a 1D target from noisy position measurements.
+  (a) The estimate smooths the measurements. (b) The errors stay inside the $\pm3\sigma$ envelopes, which
+  shrink quickly from the uninformative prior and settle at the steady-state values set by the balance
+  between process noise and measurement noise. The velocity is never measured, yet it is estimated
+  through its correlation with position.}
+  \label{fig:kf1d}
+\end{figure}
+
+\Cref{fig:kf1d} shows the filter on the double-integrator model of \cref{ex:double-integrator-qd}, with
+position measurements at 10~Hz. Three behaviors generalize to VIO. The covariance converges from its
+initial value to a steady state determined only by $Q$, $R$ and the geometry, not by the data: the
+\emph{discrete algebraic Riccati equation}. The unmeasured state (velocity) is estimated through the
+correlation that the dynamics build up between position and velocity. And the errors stay inside the
+$3\sigma$ envelope about 99.7\% of the time, the visual signature of a consistent filter.
+
+\begin{takeaways}
+\begin{itemize}
+  \item Predict: $\hat x \gets \Phi\hat x$, $P \gets \Phi P\Phi\T + Q$. Update: condition the joint Gaussian of
+        state and measurement.
+  \item $K = PH\T S\inv$ maps innovations into state corrections, including corrections to unmeasured but
+        correlated states.
+  \item Innovations of a correct filter are white with covariance $S$; their NIS is $\chi^2$.
+  \item Use the Joseph form, solve rather than invert, and symmetrize.
+  \item Discretize with $\Phi \approx I + F_c\Dt$ and $Q_d \approx G_cQ_cG_c\T\Dt$. Van Loan's method gives the exact
+        values for testing.
+\end{itemize}
+\end{takeaways}
+
+\begin{exercises}
+  \item Derive \eqref{eq:kf-update} for a scalar state measured twice by independent sensors of variances
+        $R_1$ and $R_2$, first sequentially, then as a stacked 2D measurement. Show the results agree.
+  \item Show that $P^+ \preceq P^-$ for the optimal gain. Is this still true for an arbitrary gain in the Joseph
+        form?
+  \item Construct a $2\times2$ example in which $(I - KH)P^-$ computed in single precision is not positive
+        semi-definite while the Joseph form is.
+  \item Verify \cref{prop:vanloan} numerically for the double integrator, and compare $Q_d$ with the first-order
+        approximation for $\Dt = 0.005$ and $\Dt = 0.5$.
+  \item For the scalar random walk $x_k = x_{k-1} + w_k$ with $\Var(w) = q$ and direct measurements with
+        variance $r$, solve the steady-state Riccati equation for $P^-_\infty$ and the steady-state gain.
+  \item Implement \cref{alg:kf-update} in Python, reproduce \cref{fig:kf1d}, and compute the fraction of
+        time-steps where the position error lies outside $\pm3\sigma$.
+\end{exercises}

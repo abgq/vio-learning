@@ -1,0 +1,235 @@
+\chapter{Strapdown Propagation of the Nominal State}
+\label{ch:strapdown}
+
+\begin{objectives}
+\begin{itemize}
+  \item State the continuous-time nominal kinematics and understand each term.
+  \item Derive the exact solution of the kinematics for constant inputs over a step.
+  \item Compare Euler, midpoint and Runge--Kutta integration, and predict their convergence orders.
+  \item Propagate to arbitrary timestamps, handle gaps, and initialize the nominal state.
+  \item Understand IMU preintegration as used by optimization-based estimators.
+\end{itemize}
+\end{objectives}
+
+A \emph{strapdown} inertial system has its sensors rigidly attached (strapped down) to the vehicle, as
+opposed to mounted on a stabilized gimbal platform. All the work of keeping track of orientation is done in
+software, by integrating the gyroscope. This chapter is about that integration.
+
+% ------------------------------------------------------------------------------
+\section{Continuous-time kinematics}
+
+Taking the IMU model \eqref{eq:imu-model}, replacing the unknown biases by their estimates and setting the noise
+to zero gives the nominal kinematics.
+
+\begin{convention}[nominal propagation, AGENTS.md F1]
+\begin{equation}
+  \hat a = a_m - \hat b_a,\quad \hat\omega = \omega_m - \hat b_g;\qquad
+  \dot{\hat p} = \hat v,\quad \dot{\hat v} = \hat R_{wb}\,\hat a + g_w,\quad
+  \dot{\hat q} = \tfrac12\,\hat q\qprod[0,\ \hat\omega],\quad \dot{\hat b}_a = \dot{\hat b}_g = 0 .
+  \label{eq:nominal-ct}
+\end{equation}
+The attitude update is always multiplicative, $\hat q \gets \hat q\qprod\Exp_q(\hat\omega\Dt)$, followed by
+normalization. The integration scheme for $p$ and $v$ is chosen and justified in Milestone 4 and logged
+in \texttt{PROGRESS.md}.
+\end{convention}
+
+The equations form a cascade: attitude depends on the gyroscope only; velocity depends on attitude and the
+accelerometer; position depends on velocity. Errors cascade the same way, which is the origin of the
+$t^2$ and $t^3$ growth laws of \cref{ch:intro}.
+
+% ------------------------------------------------------------------------------
+\section{Exact solution for constant inputs}
+
+Suppose $\hat\omega$ and $\hat a$ are constant over $[t_k, t_k + \Dt]$, which is what a zero-order hold of one
+IMU sample assumes. Then the kinematics can be solved in closed form.
+
+\begin{proposition}[Constant-input propagation]
+\label{prop:exact-prop}
+With $\hat\omega$, $\hat a$ constant over the step and $\phi = \hat\omega\Dt$,
+\begin{align}
+  \hat R_{k+1} &= \hat R_k\,\Exp(\phi), \\
+  \hat v_{k+1} &= \hat v_k + g_w\Dt + \hat R_k\,\Dt\,\Jl(\phi)\,\hat a, \\
+  \hat p_{k+1} &= \hat p_k + \hat v_k\Dt + \tfrac12 g_w\Dt^2 + \hat R_k\,\Dt^2\,N(\phi)\,\hat a,
+\end{align}
+where $N(\phi) = \sum_{j\ge0}\sx{\phi}^j/(j+2)! = \tfrac12 I + \frac{\theta - \sin\theta}{\theta^3}\sx{\phi} +
+\frac{\theta^2/2 + \cos\theta - 1}{\theta^4}\sx{\phi}^2$ and $\theta = \|\phi\|$.
+\end{proposition}
+\begin{proof}
+The attitude is \cref{prop:const-rate}. During the step $\hat R(t_k + s) = \hat R_k\Exp(\hat\omega s)$, so
+$\hat v_{k+1} - \hat v_k = g_w\Dt + \hat R_k\int_0^\Dt\Exp(\hat\omega s)\,\dd s\,\hat a$, and
+$\int_0^\Dt\Exp(\hat\omega s)\,\dd s = \Dt\int_0^1\Exp(u\phi)\,\dd u = \Dt\,\Jl(\phi)$ by \cref{thm:jr}. Integrating once more
+gives the position, with $\int_0^\Dt\!\int_0^s\Exp(\hat\omega u)\,\dd u\,\dd s = \Dt^2N(\phi)$ by term-wise integration of
+the exponential series, and the closed form follows from $\sx{\phi}^3 = -\theta^2\sx{\phi}$.
+\end{proof}
+
+For small $\phi$, $\Jl(\phi) \approx I + \tfrac12\sx{\phi}$ and $N(\phi) \approx \tfrac12 I + \tfrac16\sx{\phi}$. The
+correction terms account for the rotation of the specific-force vector during the step. At 200~Hz and
+1~rad/s, $\|\phi\| = 0.005$, so they change the velocity increment by about 0.25\%: small, but systematic.
+
+% ------------------------------------------------------------------------------
+\section{Numerical integration schemes}
+
+Real inputs are not constant over a step: the IMU provides samples at $t_k$ and $t_{k+1}$, and the true signal
+varies between them. Three families of schemes are common. All of them update the attitude
+multiplicatively.
+
+\paragraph{Euler with zero-order hold.} Use the sample at the start of the step for the whole step:
+\begin{equation}
+  \hat R_{k+1} = \hat R_k\Exp(\hat\omega_k\Dt), \quad
+  \hat v_{k+1} = \hat v_k + (\hat R_k\hat a_k + g_w)\Dt, \quad
+  \hat p_{k+1} = \hat p_k + \hat v_k\Dt + \tfrac12(\hat R_k\hat a_k + g_w)\Dt^2 .
+\end{equation}
+Local error $O(\Dt^2)$, global error $O(\Dt)$. The dominant error is essentially a \emph{half-sample time
+shift}: using the sample from the start of the interval for the whole interval delays the signal by
+$\Dt/2$ on average.
+
+\paragraph{Midpoint (trapezoidal).} Use the average of the two bounding samples:
+\begin{equation}
+  \hat R_{k+1} = \hat R_k\Exp\big(\tfrac12(\hat\omega_k + \hat\omega_{k+1})\Dt\big),\quad
+  \bar a_w = \tfrac12\big(\hat R_k\hat a_k + \hat R_{k+1}\hat a_{k+1}\big) + g_w,
+\end{equation}
+\begin{equation*}
+  \hat v_{k+1} = \hat v_k + \bar a_w\Dt, \qquad \hat p_{k+1} = \hat p_k + \hat v_k\Dt + \tfrac12\bar a_w\Dt^2 .
+\end{equation*}
+Local error $O(\Dt^3)$, global $O(\Dt^2)$, at the cost of having to wait for the next sample before
+completing the step.
+
+\paragraph{Runge--Kutta 4.} RK4 evaluates the dynamics at the start, twice at the middle, and at the end of
+the step. Its global error is $O(\Dt^4)$ \emph{if} the inputs at mid-step are known exactly. With an IMU
+they are not, and must be interpolated from the bounding samples. Linear interpolation is only
+second-order accurate, which caps the whole scheme at $O(\Dt^2)$.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.86\textwidth]{fig_integration_order.pdf}
+  \caption{Position error after 10~s of noise-free integration on a synthetic trajectory (2~m circle at
+  0.8~rad/s with $\pm23^\circ$ roll oscillations), as a function of the IMU period. The measured slopes
+  match the predicted global orders. RK4 reaches fourth order only with exact mid-step inputs, which a
+  real IMU does not provide; with interpolated inputs it is no better than the midpoint rule.}
+  \label{fig:integration-order}
+\end{figure}
+
+\Cref{fig:integration-order} confirms the predicted orders. Halving $\Dt$ divides the error by 2 for Euler and
+by 4 for the midpoint rule, which is exactly the convergence-order test of Milestone 4. The magnitudes
+matter as much as the slopes. At 200~Hz on this fairly dynamic trajectory, the Euler scheme accumulates
+about a meter of error in 10~s, far more than the sensor noise would cause (\cref{fig:cov-growth}), because the
+half-sample delay of the attitude creates a tilt error of order $\tfrac12\omega\Dt$, which leaks gravity. The
+midpoint rule is three orders of magnitude better. On gentler motion the difference shrinks, and frequent
+visual updates bound integration error in any case, but the integration error should be well below the
+noise-induced error, or it becomes an unmodeled error that the filter cannot account for.
+
+\begin{keyidea}[choosing a scheme]
+The integration error is a deterministic, unmodeled error. The scheme should make it small compared with
+the stochastic error the filter does model. Whichever scheme Milestone 4 adopts, document its order and
+verify it with the halving test on a trajectory with closed-form ground truth.
+\end{keyidea}
+
+\paragraph{Coning and sculling.} When the angular velocity vector itself rotates within a step (coning
+motion) or rotation and acceleration oscillate in phase (sculling), single-sample schemes rectify
+high-frequency motion into a spurious drift. High-end inertial systems with sample rates in the kHz range
+use multi-sample correction algorithms~\cite{groves2013principles}. At 200~Hz on a flying robot whose
+vibrations are mostly filtered out by the sensor, these effects are small compared with MEMS noise.
+
+% ------------------------------------------------------------------------------
+\section{Timing}
+
+\subsection{Propagating to an arbitrary time}
+
+Images arrive between IMU samples. To clone the state at an image time $t_c \in (t_k, t_{k+1})$ (AGENTS.md F5), the
+filter must propagate exactly to $t_c$: interpolate the IMU reading at $t_c$ linearly between samples $k$ and
+$k+1$, propagate from $t_k$ to $t_c$ with the interpolated input, clone, and then propagate from $t_c$ to $t_{k+1}$.
+The covariance follows the same split, with $\Dt$ replaced by the two partial intervals.
+
+\subsection{Event ordering and gaps}
+
+Measurements must be processed in timestamp order, and the state must be propagated to a measurement's time
+before the measurement is applied (\cref{ch:fullalgo}). Milestone 3 fixes the tie rule: an IMU sample precedes a
+measurement with an equal timestamp, so the state is propagated to that time first. Gaps in the IMU stream
+(intervals larger than about $1.5$ nominal periods) must not be assumed away. $\Dt$ always comes from the
+timestamps, and a long gap simply produces a long step with a correspondingly large $Q_d$.
+
+% ------------------------------------------------------------------------------
+\section{Initialization}
+
+\subsection{From ground truth}
+
+The project initializes the nominal state from the first ground-truth sample at or after the start of the
+stream (Milestone 4): $p$, $v$, $q$, $b_a$ and $b_g$ all come from the ground-truth columns, mapped with the
+column order of AGENTS.md C7. This isolates propagation from the initialization problem. The use of ground
+truth for initialization is logged when the full VIO runs (Milestone 10b).
+
+\subsection{Static initialization}
+
+A real system initializes from its own sensors. If the vehicle is at rest for about a second,
+\begin{equation}
+  \bar a_m = \mathrm{mean}(a_m) \approx R_{wb}\T(-g_w) + b_a, \qquad \bar\omega_m = \mathrm{mean}(\omega_m) \approx b_g .
+\end{equation}
+The gyro bias is the mean rate. Neglecting $b_a$, the unit vector $u_b = \bar a_m/\|\bar a_m\|$ is the world
+``up'' direction expressed in the body frame, $u_b = R_{wb}\T e_z$. Any rotation with $R_{wb}u_b = e_z$ is consistent
+with it: rotating about the axis $u_b\times e_z$ by the angle between the two vectors (computed with
+$\atantwo$) gives one, and composing with any rotation about $e_z$ gives all the others. Roll and pitch are
+determined; yaw is arbitrary, and is set to zero (or to the ground-truth yaw for evaluation).
+
+\begin{pitfall}[tilt and accelerometer bias are indistinguishable at rest]
+A horizontal accelerometer bias $b_a$ produces the same reading as a tilt of $\|b_a\|/g$: a bias of
+$10~\mathrm{mm/s^2}$ looks exactly like a tilt of $1$~mrad. At rest the filter cannot separate them, and the initial
+covariance must say so (large $\sigma_{b_a}$, correlated with the tilt). They become separable once the vehicle
+rotates, because the bias rotates with the body while gravity does not.
+\end{pitfall}
+
+Initial covariances should reflect real uncertainty: a few milliradians in roll and pitch, a large or
+unknown yaw, the turn-on bias range from the datasheet, and a small but non-zero velocity uncertainty at rest.
+\emph{Dynamic} initialization from a moving start, as in VINS-Mono~\cite{qin2018vins}, first solves a
+vision-only structure-from-motion problem and then aligns it with preintegrated IMU data to recover scale,
+gravity and velocity.
+
+% ------------------------------------------------------------------------------
+\section{Sidebar: IMU preintegration}
+
+An optimization-based estimator may relinearize a window of states many times. Re-integrating every IMU
+sample between keyframes $i$ and $j$ each time the estimate of state $i$ changes would be wasteful.
+\emph{Preintegration}~\cite{lupton2012visual, forster2017preintegration} integrates the measurements in the body frame
+of keyframe $i$, so that the result does not depend on the state at $i$:
+\begin{equation}
+  \Delta R_{ij} = \prod_{k=i}^{j-1}\Exp(\hat\omega_k\Dt), \quad
+  \Delta v_{ij} = \sum_{k=i}^{j-1}\Delta R_{ik}\,\hat a_k\Dt, \quad
+  \Delta p_{ij} = \sum_{k=i}^{j-1}\Big(\Delta v_{ik}\Dt + \tfrac12\Delta R_{ik}\,\hat a_k\Dt^2\Big).
+\end{equation}
+These relate the two keyframe states through
+$R_j = R_i\Delta R_{ij}$, $v_j = v_i + g\Delta t_{ij} + R_i\Delta v_{ij}$ and
+$p_j = p_i + v_i\Delta t_{ij} + \tfrac12g\Delta t_{ij}^2 + R_i\Delta p_{ij}$. The preintegrated quantities depend on the
+bias estimate, and first-order bias Jacobians avoid re-integration when the bias estimate changes. A filter
+like the MSCKF does not need preintegration, because it integrates each sample exactly once.
+
+\begin{projectlink}[Milestone 4]
+Exit criteria: a stationary input keeps the state constant to $10^{-9}$ for 60~s; a constant rate reproduces
+$q_0\qprod\Exp_q(\omega t)$; a circular trajectory converges at the predicted order; the quaternion norm stays
+within $10^{-12}$ of one after $10^6$ steps; propagation does not allocate; and 10~s of dead reckoning on
+MH\_01 produce no NaN.
+\end{projectlink}
+
+\begin{takeaways}
+\begin{itemize}
+  \item $\dot p = v$, $\dot v = R\hat a + g$, $\dot q = \tfrac12 q\qprod[0,\hat\omega]$; attitude updates are multiplicative.
+  \item For constant inputs the solution is exact: $R\Exp(\phi)$, $v + g\Dt + R\Dt\Jl(\phi)\hat a$, and a similar
+        position formula.
+  \item Euler is first order (a half-sample delay), midpoint second order. RK4 is limited to second order by
+        input interpolation.
+  \item Integration error is unmodeled error; keep it well below sensor-noise error and verify the order.
+  \item Propagate exactly to measurement times by splitting the IMU interval.
+  \item At rest, gravity gives roll and pitch, the mean gyro gives $b_g$, and tilt and horizontal $b_a$ are
+        indistinguishable.
+\end{itemize}
+\end{takeaways}
+
+\begin{exercises}
+  \item Verify \cref{prop:exact-prop} numerically by comparing with an ODE solver at tight tolerance.
+  \item Show that the Euler scheme applied to a constant rotation rate is exact for the attitude, but not for
+        the velocity, and quantify the velocity error per step in terms of $\|\hat\omega\|\Dt$.
+  \item Reproduce \cref{fig:integration-order}. Then add gyro noise and plot the noise-induced position error
+        on the same axes. At what IMU rate does integration error fall below noise error for each scheme?
+  \item Implement the static initializer and test it on synthetic data with a known tilt. Add a horizontal
+        accelerometer bias and show that it biases the estimated tilt by $\|b_a\|/g$.
+  \item Why must the propagation to an image timestamp interpolate the IMU sample instead of using the
+        nearest sample? Estimate the attitude error from using the nearest sample at 1~rad/s and 200~Hz.
+\end{exercises}

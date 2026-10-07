@@ -1,0 +1,104 @@
+\chapter{Notation and Conventions}
+\label{app:notation}
+
+This appendix restates the frozen conventions of \texttt{AGENTS.md} in one place, together with the notation of these notes.
+
+\section*{Frames and transformations}
+
+\begin{center}\small
+\begin{tabularx}{\textwidth}{@{}l l X@{}}
+\toprule
+Symbol & Code name & Meaning \\
+\midrule
+$W$ & --- & world frame: fixed, gravity-aligned, $z$ up; EuRoC \code{R} \\
+$B$ & --- & body frame = IMU \code{imu0}; EuRoC \code{S} in \code{imu0} \\
+$C$ & --- & left camera \code{cam0}: $z$ optical axis, $x$ right, $y$ down \\
+$R_{wb}$, $q_{wb}$ & \code{R\_wb}, \code{q\_wb} & attitude, maps body to world: $v_w = R_{wb}v_b$ \\
+$p_{wb}$ & \code{p\_wb} & position of $B$'s origin in $W$ \\
+$v_{wb}$ & \code{v\_wb} & velocity of $B$ relative to $W$, expressed in $W$ \\
+$T_{bc} = (R_{bc}, p_{bc})$ & \code{T\_bc} & camera-to-body: $p_b = R_{bc}p_c + p_{bc}$; EuRoC \code{T\_BS} of \code{cam0} \\
+$g_w$ & --- & gravity, $[0, 0, -9.81]\T~\mathrm{m/s^2}$ \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Naming rule: \code{<quantity>\_<to><from>}; adjacent subscripts of a product must match ($R_{wb}R_{bc} = R_{wc}$).
+
+\section*{State, error state and noise}
+
+\begin{center}\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+Error index & Block & Definition \\
+\midrule
+0--2 & $\delta p$ & $p = \hat p + \delta p$ (world) \\
+3--5 & $\delta v$ & $v = \hat v + \delta v$ (world) \\
+6--8 & $\delta\theta$ & $q = \hat q\qprod\Exp_q(\delta\theta)$ (body, local) \\
+9--11 & $\delta b_a$ & $b_a = \hat b_a + \delta b_a$ \\
+12--14 & $\delta b_g$ & $b_g = \hat b_g + \delta b_g$ \\
+$15+6i$\dots & $\delta p_i$ & clone $i$ position \\
+$18+6i$\dots & $\delta\theta_i$ & clone $i$ attitude (local) \\
+\bottomrule
+\end{tabular}
+\qquad
+\begin{tabular}{@{}l l@{}}
+\toprule
+Noise index & Block \\
+\midrule
+0--2 & $n_a$ \\
+3--5 & $n_g$ \\
+6--8 & $n_{b_a}$ \\
+9--11 & $n_{b_g}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{Operators and symbols}
+
+\begin{center}\small
+\begin{tabularx}{\textwidth}{@{}l X@{}}
+\toprule
+Symbol & Meaning \\
+\midrule
+$a\T$, $A\inv$, $A\mT$ & transpose, inverse, inverse transpose \\
+$\sx{a}$, $a\hatop$ & skew-symmetric (cross-product) matrix of $a\in\R^3$ \\
+$(\cdot)\veeop$ & inverse of the hat map \\
+$\qprod$ & Hamilton quaternion product \\
+$q^*$ & quaternion conjugate \\
+$\exp$, $\log$ & matrix exponential and logarithm \\
+$\Exp$, $\Log$ & $\R^3\leftrightarrow\SO$; $\Exp_q$, $\Log_q$ for unit quaternions \\
+$\Jr$, $\Jl$ & right and left Jacobians of $\SO$ \\
+$\bplus$, $\bminus$ & retraction and local difference (AGENTS.md C4) \\
+$\hat x$, $\delta x$, $x$ & nominal (estimated), error, and true state \\
+$P$, $Q_c$, $Q_d$, $R_z$ & error covariance, continuous and discrete process noise, measurement noise \\
+$F_c$, $G_c$, $\Phi$ & continuous error dynamics, noise input matrix, discrete transition \\
+$H$, $S$, $K$, $r$ & measurement Jacobian, innovation covariance, gain, residual \\
+$\N(\mu, \Sigma)$ & Gaussian distribution \\
+$\chi^2_k$, $\chi^2_p(k)$ & chi-squared distribution with $k$ DOF; its quantile at probability $p$ \\
+$\pi(\cdot)$ & pinhole projection $(X/Z, Y/Z)$ \\
+$u$, $\mach$ & unit roundoff $2^{-53}$, machine epsilon $2^{-52}$ \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\section*{Abbreviations}
+
+\begin{center}\small
+\begin{tabularx}{\textwidth}{@{}l X@{}}
+\toprule
+ATE / RPE & absolute trajectory error / relative pose error \\
+BCH & Baker--Campbell--Hausdorff formula \\
+DOF & degrees of freedom \\
+EKF / ESKF & extended / error-state Kalman filter \\
+FEJ & first-estimates Jacobians \\
+IMU & inertial measurement unit \\
+KLT / LK & Kanade--Lucas--Tomasi tracker / Lucas--Kanade optical flow \\
+MSCKF & multi-state constraint Kalman filter \\
+NEES / NIS & normalized estimation error squared / normalized innovation squared \\
+PSD / PD & positive semi-definite / positive definite \\
+RANSAC & random sample consensus \\
+SLAM & simultaneous localization and mapping \\
+VIO & visual-inertial odometry \\
+\bottomrule
+\end{tabularx}
+\end{center}

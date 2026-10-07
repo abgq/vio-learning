@@ -1,0 +1,152 @@
+\chapter{Solutions to the Project Derivation Exercises}
+\label{app:solutions}
+
+\begin{pitfall}[read this first]
+These are the Jacobians that \texttt{AGENTS.md} (Guardrail 4) asks you to derive yourself. Attempt each exercise first, check your
+result numerically, and only then compare. Every result below was verified against central finite differences built on the project's
+$\bplus/\bminus$ operators.
+\end{pitfall}
+
+% ------------------------------------------------------------------------------
+\section{Error-state dynamics \texorpdfstring{$F_c$}{Fc} and \texorpdfstring{$G_c$}{Gc}}
+\label{sol:Fc}
+
+\paragraph{Attitude.} Differentiate $R = \hat R\Exp(\delta\theta)$ with \cref{lem:dexp}, to first order:
+\begin{equation*}
+  \dot R = \dot{\hat R}\Exp(\delta\theta) + \hat R\Exp(\delta\theta)\sx{\dot{\delta\theta}}
+         = \hat R\sx{\hat\omega}\Exp(\delta\theta) + \hat R\Exp(\delta\theta)\sx{\dot{\delta\theta}} .
+\end{equation*}
+The true kinematics give $\dot R = R\sx{\omega} = \hat R\Exp(\delta\theta)\sx{\omega}$. Equate and multiply on the left by $(\hat R\Exp(\delta\theta))\T$:
+\begin{equation*}
+  \sx{\omega} = \Exp(-\delta\theta)\sx{\hat\omega}\Exp(\delta\theta) + \sx{\dot{\delta\theta}} = \sx{\Exp(-\delta\theta)\hat\omega} + \sx{\dot{\delta\theta}} .
+\end{equation*}
+With $\Exp(-\delta\theta)\hat\omega \approx \hat\omega - \delta\theta\times\hat\omega = \hat\omega + \hat\omega\times\delta\theta$ and $\omega - \hat\omega = -\delta b_g - n_g$:
+\begin{equation}
+  \dot{\delta\theta} = -\sx{\hat\omega}\,\delta\theta - \delta b_g - n_g .
+\end{equation}
+The term $-\sx{\hat\omega}\delta\theta$, absent in the global version (\cref{ex:global-attitude}), appears because the error is expressed in body axes
+that rotate with angular velocity $\hat\omega$. An error fixed in the world appears to rotate backwards in the body frame.
+
+\paragraph{Velocity.} With $R \approx \hat R(I + \sx{\delta\theta})$ and $a_m - b_a - n_a = \hat a - \delta b_a - n_a$:
+\begin{equation*}
+  \dot{\hat v} + \dot{\delta v} \approx \hat R\hat a + \hat R\sx{\delta\theta}\hat a - \hat R\delta b_a - \hat Rn_a + g_w,
+\end{equation*}
+dropping the second-order products $\sx{\delta\theta}\delta b_a$ and $\sx{\delta\theta}n_a$. Subtracting $\dot{\hat v} = \hat R\hat a + g_w$ and using
+$\sx{\delta\theta}\hat a = -\sx{\hat a}\delta\theta$:
+\begin{equation}
+  \dot{\delta v} = -\hat R\sx{\hat a}\,\delta\theta - \hat R\,\delta b_a - \hat R\,n_a .
+\end{equation}
+
+\paragraph{Assembly.} With the frozen orders $\delta x = [\delta p, \delta v, \delta\theta, \delta b_a, \delta b_g]$ and $w = [n_a, n_g, n_{b_a}, n_{b_g}]$:
+\begin{equation}
+  F_c = \begin{bmatrix}
+    0 & I & 0 & 0 & 0 \\
+    0 & 0 & -\hat R\sx{\hat a} & -\hat R & 0 \\
+    0 & 0 & -\sx{\hat\omega} & 0 & -I \\
+    0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0
+  \end{bmatrix}, \qquad
+  G_c = \begin{bmatrix}
+    0 & 0 & 0 & 0 \\
+    -\hat R & 0 & 0 & 0 \\
+    0 & -I & 0 & 0 \\
+    0 & 0 & I & 0 \\
+    0 & 0 & 0 & I
+  \end{bmatrix},
+\end{equation}
+all blocks $3\times3$, with $\hat R = \hat R_{wb}$, $\hat a = a_m - \hat b_a$, $\hat\omega = \omega_m - \hat b_g$. The structural zeros follow from the cascade: position
+depends only on velocity; attitude does not depend on position, velocity or the accelerometer bias; the biases are driven only by
+their own noise. Since $Q_c$ is block-diagonal and $\hat R\hat R\T = I$,
+$Q_d \approx G_cQ_cG_c\T\Dt = \diag(0,\ \sigma_a^2I,\ \sigma_g^2I,\ \sigma_{b_a}^2I,\ \sigma_{b_g}^2I)\,\Dt$.
+
+\paragraph{Checking the signs.} Rotating a positive error $\delta\theta$ about $\hat\omega$ itself gives $-\sx{\hat\omega}\hat\omega = 0$: an error about the rotation axis
+does not move, as it should. A positive gyro bias error makes the true rate smaller than the estimated one, so the true attitude
+lags and $\dot{\delta\theta} = -\delta b_g$. For a level, static IMU, $\hat a = [0, 0, g]$, and $-\sx{\hat a}\delta\theta = g\,(\delta\theta_y, -\delta\theta_x, 0)$: a tilt about $y$
+produces a velocity error along $x$, the gravity leak.
+
+% ------------------------------------------------------------------------------
+\section{Closed-form blocks of \texorpdfstring{$\Phi$}{Phi}}
+\label{sol:Phi}
+
+The project's default is $\Phi \approx I + F_c\Dt$. If a higher-order transition is adopted (and logged), the exact solution of the error
+dynamics over a step with constant $\hat\omega$, $\hat a$, and with $\hat R(s) = \hat R_k\Exp(\hat\omega s)$ evolving inside the step, has these blocks,
+with $\phi = \hat\omega\Dt$ and $N(\phi)$ from \cref{prop:exact-prop}:
+\begin{align*}
+  \Phi_{\theta\theta} &= \Exp(-\phi) = \Exp(\phi)\T, & \Phi_{\theta b_g} &= -\Dt\,\Jr(\phi), \\
+  \Phi_{v\theta} &= -\hat R_k\sx{\Dt\,\Jl(\phi)\hat a}, & \Phi_{vb_a} &= -\hat R_k\,\Dt\,\Jl(\phi), \\
+  \Phi_{p\theta} &= -\hat R_k\sx{\Dt^2N(\phi)\hat a}, & \Phi_{pb_a} &= -\hat R_k\,\Dt^2N(\phi), \qquad \Phi_{pv} = \Dt\,I .
+\end{align*}
+The remaining coupling blocks ($\Phi_{vb_g}$, $\Phi_{pb_g}$) have no compact closed form; compute them by series or numerically, and use
+Van Loan's method (\cref{prop:vanloan}) or a fine numerical integration of $\dot\Phi = F_c(s)\Phi$ as the test oracle. To first order in
+$\Dt$, every block reduces to the corresponding block of $I + F_c\Dt$.
+
+% ------------------------------------------------------------------------------
+\section{Pose measurement Jacobian}
+\label{sol:Hpose}
+
+With $h(x) = (p_{wb}, q_{wb})$ and $r(\delta x) = h(\hat x\bplus\delta x)\bminus h(\hat x)$:
+\begin{equation*}
+  r_p = (\hat p + \delta p) - \hat p = \delta p, \qquad
+  r_\theta = \Log_q\big(\hat q\inv\qprod\hat q\qprod\Exp_q(\delta\theta)\big) = \delta\theta .
+\end{equation*}
+Both are exact, so
+\begin{equation}
+  H = \begin{bmatrix} I_3 & 0 & 0 & 0 & 0 \\ 0 & 0 & I_3 & 0 & 0 \end{bmatrix} \in \R^{6\times15}.
+\end{equation}
+Its nullspace is spanned by $\delta v$, $\delta b_a$ and $\delta b_g$: these are not measured directly and are corrected through their
+cross-covariances with $\delta p$ and $\delta\theta$. The simplicity of the attitude block is a consequence of the noise model
+$q_{meas} = q\qprod\Exp_q(n_\theta)$ matching the local perturbation, which makes $r_\theta = \Log(\Exp(\delta\theta)\Exp(n_\theta)) \approx \delta\theta + n_\theta$.
+If the residual is instead linearized around a non-zero value $r_0$ (an iterated update, or the optimization view of
+\cref{sec:manifold-update}), the derivative of $\Log(\Exp(-\delta\theta)\Exp(r_0))$ with respect to $\delta\theta$ is $-\Jlinv(r_0)$, which reduces to $-I$ for small
+$r_0$, the sign being that of the optimization convention.
+
+% ------------------------------------------------------------------------------
+\section{Cloning Jacobian}
+\label{sol:clone}
+
+At cloning time the true clone equals the true IMU pose and the clone's nominal equals the IMU nominal, so
+\begin{equation*}
+  \delta p_c = p - \hat p = \delta p, \qquad \Exp(\delta\theta_c) = \hat q\inv\qprod q = \Exp(\delta\theta)\ \Rightarrow\ \delta\theta_c = \delta\theta,
+\end{equation*}
+exactly, without linearization. With the new clone appended at the end of an $n = 15 + 6N$ dimensional state,
+\begin{equation}
+  J_g = \begin{bmatrix} I_3 & 0 & 0 & 0 & 0 & 0_{3\times6N} \\ 0 & 0 & I_3 & 0 & 0 & 0_{3\times6N} \end{bmatrix}\in\R^{6\times n},
+  \qquad J = \begin{bmatrix} I_n \\ J_g \end{bmatrix}.
+\end{equation}
+Consequently $JPJ\T$ copies blocks: the new clone's covariance is
+$\begin{bmatrix} P_{pp} & P_{p\theta} \\ P_{\theta p} & P_{\theta\theta}\end{bmatrix}$, and its cross-covariance with every other state is the stacked $p$ and $\theta$ rows of $P$.
+No matrix product is needed in the implementation.
+
+If the clone stored the camera pose, $R_{wc} = R_{wb}R_{bc}$ and $p_{wc} = p_{wb} + R_{wb}p_{bc}$ would give
+$\delta\theta_c = R_{bc}\T\delta\theta$ and $\delta p_c = \delta p - \hat R\sx{p_{bc}}\delta\theta$, by the composition and rotation-action rows of \cref{tab:jacobians}. Storing the
+IMU pose keeps $J$ trivial and moves the extrinsics into the measurement model.
+
+% ------------------------------------------------------------------------------
+\section{Visual measurement Jacobians}
+\label{sol:Hcam}
+
+Write $\hat d_i = \hat R_{wb_i}\T(\hat p_f - \hat p_{wb_i})$, the feature in the clone's body frame. Perturbing the clone and the feature,
+\begin{equation*}
+  R_{wb_i}\T(p_f - p_{wb_i}) \approx (I - \sx{\delta\theta_i})\hat R_{wb_i}\T(\hat p_f + \delta p_f - \hat p_{wb_i} - \delta p_i)
+  \approx \hat d_i + \sx{\hat d_i}\delta\theta_i - \hat R_{wb_i}\T\delta p_i + \hat R_{wb_i}\T\delta p_f ,
+\end{equation*}
+using the inverse-action row of \cref{tab:jacobians}. Applying $R_{bc}\T$ (the subtraction of $p_{bc}$ is constant):
+\begin{equation}
+  \frac{\partial p_{c_i}}{\partial\delta\theta_i} = R_{bc}\T\sx{\hat d_i}, \qquad
+  \frac{\partial p_{c_i}}{\partial\delta p_i} = -R_{bc}\T\hat R_{wb_i}\T, \qquad
+  \frac{\partial p_{c_i}}{\partial p_f} = R_{bc}\T\hat R_{wb_i}\T .
+\end{equation}
+Moving the clone by $\delta$ is equivalent to moving the feature by $-\delta$, hence the opposite signs. With
+$J_\pi = \frac1{\hat Z}\begin{bmatrix} I_2 & -\pi(\hat p_{c_i})\end{bmatrix}$ from \cref{prop:proj-jacobian}:
+\begin{equation}
+  H_{x,ji} = \Big[\ 0_{2\times15}\ \ \cdots\ \ \underbrace{-J_\pi R_{bc}\T\hat R_{wb_i}\T}_{\delta p_i}\ \ \underbrace{J_\pi R_{bc}\T\sx{\hat d_i}}_{\delta\theta_i}\ \ \cdots\ \Big],
+  \qquad
+  H_{f,ji} = J_\pi R_{bc}\T\hat R_{wb_i}\T ,
+\end{equation}
+with the two non-zero blocks in clone $i$'s columns $15 + 6i \dots 20 + 6i$, and zeros in the IMU columns and in every other clone's columns.
+The stacked $H_{x,j}$ therefore has one $2\times6$ non-zero block per observation (\cref{fig:hx-sparsity}).
+
+\paragraph{Checking the signs.} Translate the clone along the camera's optical axis toward the feature: the feature gets closer, so its
+image moves away from the principal point, and $-J_\pi R_{bc}\T\hat R_{wb_i}\T\delta p_i$ predicts exactly that. Rotate the clone about the camera's
+$y$-axis by a small positive angle ($\delta\theta_i = \alpha R_{bc}e_y$): the image of a distant point on the optical axis moves in $-x$, which the
+$\delta\theta_i$ block reproduces (for a near point, the lever arm $p_{bc}$ adds a small translation of the camera center).

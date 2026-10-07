@@ -1,0 +1,141 @@
+\chapter*{Further Reading}
+\addcontentsline{toc}{chapter}{Further Reading}
+\markboth{Further Reading}{}
+
+\paragraph{Estimation theory.} Bar-Shalom, Li and Kirubarajan~\cite{barshalom2001} is the standard reference for Kalman filtering,
+consistency testing (NEES, NIS) and tracking practice. Maybeck~\cite{maybeck1979} remains the clearest treatment of continuous-time
+stochastic models and their discretization, and Simon~\cite{simon2006} is a modern, readable textbook.
+
+\paragraph{Rotations and Lie theory.} Solà's quaternion notes~\cite{sola2017quaternion} derive the error-state filter with exactly the
+conventions of this project and are the best single companion to \cref{ch:eskf,ch:errordyn}. The micro Lie theory
+paper~\cite{sola2018micro} is a short, practical introduction to manifolds, Jacobians and $\bplus/\bminus$. Barfoot~\cite{barfoot2017state}
+develops estimation on matrix Lie groups in depth. Sommer et al.~\cite{sommer2018flipped} explain the Hamilton/JPL confusion once and for all.
+
+\paragraph{Inertial navigation.} Groves~\cite{groves2013principles} covers inertial sensors, error models and strapdown algorithms
+comprehensively. El-Sheimy et al.~\cite{elsheimy2008allan} is a good introduction to the Allan variance.
+
+\paragraph{Computer vision.} Hartley and Zisserman~\cite{hartley2004} is the reference for multi-view geometry; Ma et
+al.~\cite{ma2004invitation} gives a more geometric, calibrated-camera treatment closer to how VIO uses vision. Baker and
+Matthews~\cite{baker2004lk} unify the many variants of Lucas--Kanade.
+
+\paragraph{Visual-inertial odometry.} Read the original MSCKF paper~\cite{mourikis2007msckf} first, then MSCKF 2.0~\cite{li2013msckf2}
+for consistency and calibration. Huang's review~\cite{huang2019review} and Scaramuzza and Zhang~\cite{scaramuzza2019vio} survey the
+field. The OpenVINS documentation and paper~\cite{geneva2020openvins} and the MSCKF-VIO code~\cite{sun2018msckfvio} are excellent
+engineering references. For the optimization-based alternative, start with preintegration~\cite{forster2017preintegration}, VINS-Mono
+\cite{qin2018vins} and the factor-graph tutorial of Dellaert and Kaess~\cite{dellaert2017factor}.
+
+\paragraph{Numerical linear algebra.} Golub and Van Loan~\cite{golub2013} for factorizations, Higham~\cite{higham2002} for floating-point
+error analysis.
+
+\renewcommand{\bibname}{References}
+\begin{thebibliography}{99}
+\addcontentsline{toc}{chapter}{References}
+\small
+
+\bibitem{baker2004lk} S.~Baker and I.~Matthews. Lucas--Kanade 20 years on: A unifying framework. \emph{International Journal of Computer Vision}, 56(3):221--255, 2004.
+
+\bibitem{barshalom2001} Y.~Bar-Shalom, X.~R. Li, and T.~Kirubarajan. \emph{Estimation with Applications to Tracking and Navigation}. Wiley, 2001.
+
+\bibitem{barfoot2017state} T.~D. Barfoot. \emph{State Estimation for Robotics}. Cambridge University Press, 2017 (2nd ed.\ 2024).
+
+\bibitem{barrau2017invariant} A.~Barrau and S.~Bonnabel. The invariant extended Kalman filter as a stable observer. \emph{IEEE Transactions on Automatic Control}, 62(4):1797--1812, 2017.
+
+\bibitem{bloesch2015rovio} M.~Bloesch, S.~Omari, M.~Hutter, and R.~Siegwart. Robust visual inertial odometry using a direct EKF-based approach. In \emph{IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)}, 2015.
+
+\bibitem{bouguet2001pyramidal} J.-Y. Bouguet. Pyramidal implementation of the affine Lucas Kanade feature tracker: description of the algorithm. Technical report, Intel Corporation, Microprocessor Research Labs, 2001.
+
+\bibitem{burri2016euroc} M.~Burri, J.~Nikolic, P.~Gohl, T.~Schneider, J.~Rehder, S.~Omari, M.~W. Achtelik, and R.~Siegwart. The EuRoC micro aerial vehicle datasets. \emph{The International Journal of Robotics Research}, 35(10):1157--1163, 2016.
+
+\bibitem{campos2021orbslam3} C.~Campos, R.~Elvira, J.~J. G\'omez Rodr\'iguez, J.~M.~M. Montiel, and J.~D. Tard\'os. ORB-SLAM3: An accurate open-source library for visual, visual-inertial, and multimap SLAM. \emph{IEEE Transactions on Robotics}, 37(6):1874--1890, 2021.
+
+\bibitem{civera2008inverse} J.~Civera, A.~J. Davison, and J.~M.~M. Montiel. Inverse depth parametrization for monocular SLAM. \emph{IEEE Transactions on Robotics}, 24(5):932--945, 2008.
+
+\bibitem{davison2007monoslam} A.~J. Davison, I.~D. Reid, N.~D. Molton, and O.~Stasse. MonoSLAM: Real-time single camera SLAM. \emph{IEEE Transactions on Pattern Analysis and Machine Intelligence}, 29(6):1052--1067, 2007.
+
+\bibitem{dellaert2017factor} F.~Dellaert and M.~Kaess. Factor graphs for robot perception. \emph{Foundations and Trends in Robotics}, 6(1--2):1--139, 2017.
+
+\bibitem{delmerico2018benchmark} J.~Delmerico and D.~Scaramuzza. A benchmark comparison of monocular visual-inertial odometry algorithms for flying robots. In \emph{IEEE International Conference on Robotics and Automation (ICRA)}, 2018.
+
+\bibitem{elsheimy2008allan} N.~El-Sheimy, H.~Hou, and X.~Niu. Analysis and modeling of inertial sensors using Allan variance. \emph{IEEE Transactions on Instrumentation and Measurement}, 57(1):140--149, 2008.
+
+\bibitem{fischler1981ransac} M.~A. Fischler and R.~C. Bolles. Random sample consensus: A paradigm for model fitting with applications to image analysis and automated cartography. \emph{Communications of the ACM}, 24(6):381--395, 1981.
+
+\bibitem{forster2017preintegration} C.~Forster, L.~Carlone, F.~Dellaert, and D.~Scaramuzza. On-manifold preintegration for real-time visual-inertial odometry. \emph{IEEE Transactions on Robotics}, 33(1):1--21, 2017.
+
+\bibitem{furgale2013kalibr} P.~Furgale, J.~Rehder, and R.~Siegwart. Unified temporal and spatial calibration for multi-sensor systems. In \emph{IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)}, 2013.
+
+\bibitem{geneva2020openvins} P.~Geneva, K.~Eckenhoff, W.~Lee, Y.~Yang, and G.~Huang. OpenVINS: A research platform for visual-inertial estimation. In \emph{IEEE International Conference on Robotics and Automation (ICRA)}, 2020.
+
+\bibitem{golub2013} G.~H. Golub and C.~F. Van Loan. \emph{Matrix Computations}. Johns Hopkins University Press, 4th edition, 2013.
+
+\bibitem{groves2013principles} P.~D. Groves. \emph{Principles of GNSS, Inertial, and Multisensor Integrated Navigation Systems}. Artech House, 2nd edition, 2013.
+
+\bibitem{grupp2017evo} M.~Grupp. evo: Python package for the evaluation of odometry and SLAM. \url{https://github.com/MichaelGrupp/evo}, 2017.
+
+\bibitem{harris1988corner} C.~Harris and M.~Stephens. A combined corner and edge detector. In \emph{Proceedings of the Alvey Vision Conference}, 1988.
+
+\bibitem{hartley2004} R.~Hartley and A.~Zisserman. \emph{Multiple View Geometry in Computer Vision}. Cambridge University Press, 2nd edition, 2004.
+
+\bibitem{hesch2014consistency} J.~A. Hesch, D.~G. Kottas, S.~L. Bowman, and S.~I. Roumeliotis. Consistency analysis and improvement of vision-aided inertial navigation. \emph{IEEE Transactions on Robotics}, 30(1):158--176, 2014.
+
+\bibitem{higham2002} N.~J. Higham. \emph{Accuracy and Stability of Numerical Algorithms}. SIAM, 2nd edition, 2002.
+
+\bibitem{huang2008fej} G.~P. Huang, A.~I. Mourikis, and S.~I. Roumeliotis. A first-estimates Jacobian EKF for improving SLAM consistency. In \emph{Experimental Robotics (ISER 2008)}, Springer Tracts in Advanced Robotics, vol.~54, 2009.
+
+\bibitem{huang2010observability} G.~P. Huang, A.~I. Mourikis, and S.~I. Roumeliotis. Observability-based rules for designing consistent EKF SLAM estimators. \emph{The International Journal of Robotics Research}, 29(5):502--528, 2010.
+
+\bibitem{huang2019review} G.~Huang. Visual-inertial navigation: A concise review. In \emph{IEEE International Conference on Robotics and Automation (ICRA)}, 2019.
+
+\bibitem{ieee952} IEEE Std 952-1997. \emph{IEEE Standard Specification Format Guide and Test Procedure for Single-Axis Interferometric Fiber Optic Gyros} (includes the Allan variance method). IEEE, 1997.
+
+\bibitem{kalman1960} R.~E. Kalman. A new approach to linear filtering and prediction problems. \emph{Transactions of the ASME, Journal of Basic Engineering}, 82(1):35--45, 1960.
+
+\bibitem{leutenegger2015okvis} S.~Leutenegger, S.~Lynen, M.~Bosse, R.~Siegwart, and P.~Furgale. Keyframe-based visual-inertial odometry using nonlinear optimization. \emph{The International Journal of Robotics Research}, 34(3):314--334, 2015.
+
+\bibitem{li2013msckf2} M.~Li and A.~I. Mourikis. High-precision, consistent EKF-based visual-inertial odometry. \emph{The International Journal of Robotics Research}, 32(6):690--711, 2013.
+
+\bibitem{li2014timeoffset} M.~Li and A.~I. Mourikis. Online temporal calibration for camera-IMU systems: Theory and algorithms. \emph{The International Journal of Robotics Research}, 33(7):947--964, 2014.
+
+\bibitem{lucas1981iterative} B.~D. Lucas and T.~Kanade. An iterative image registration technique with an application to stereo vision. In \emph{International Joint Conference on Artificial Intelligence (IJCAI)}, 1981.
+
+\bibitem{lupton2012visual} T.~Lupton and S.~Sukkarieh. Visual-inertial-aided navigation for high-dynamic motion in built environments without initial conditions. \emph{IEEE Transactions on Robotics}, 28(1):61--76, 2012.
+
+\bibitem{ma2004invitation} Y.~Ma, S.~Soatto, J.~Ko\v{s}eck\'a, and S.~S. Sastry. \emph{An Invitation to 3-D Vision}. Springer, 2004.
+
+\bibitem{maybeck1979} P.~S. Maybeck. \emph{Stochastic Models, Estimation, and Control}, volume~1. Academic Press, 1979.
+
+\bibitem{mourikis2007msckf} A.~I. Mourikis and S.~I. Roumeliotis. A multi-state constraint Kalman filter for vision-aided inertial navigation. In \emph{IEEE International Conference on Robotics and Automation (ICRA)}, pages 3565--3572, 2007.
+
+\bibitem{nister2004five} D.~Nist\'er. An efficient solution to the five-point relative pose problem. \emph{IEEE Transactions on Pattern Analysis and Machine Intelligence}, 26(6):756--770, 2004.
+
+\bibitem{qin2018vins} T.~Qin, P.~Li, and S.~Shen. VINS-Mono: A robust and versatile monocular visual-inertial state estimator. \emph{IEEE Transactions on Robotics}, 34(4):1004--1020, 2018.
+
+\bibitem{roumeliotis2002cloning} S.~I. Roumeliotis and J.~W. Burdick. Stochastic cloning: A generalized framework for processing relative state measurements. In \emph{IEEE International Conference on Robotics and Automation (ICRA)}, 2002.
+
+\bibitem{scaramuzza2019vio} D.~Scaramuzza and Z.~Zhang. Visual-inertial odometry of aerial robots. In \emph{Encyclopedia of Robotics}. Springer, 2019. arXiv:1906.03289.
+
+\bibitem{shi1994good} J.~Shi and C.~Tomasi. Good features to track. In \emph{IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, 1994.
+
+\bibitem{simon2006} D.~Simon. \emph{Optimal State Estimation: Kalman, $H_\infty$, and Nonlinear Approaches}. Wiley, 2006.
+
+\bibitem{sola2017quaternion} J.~Sol\`a. Quaternion kinematics for the error-state Kalman filter. arXiv:1711.02508, 2017.
+
+\bibitem{sola2018micro} J.~Sol\`a, J.~Deray, and D.~Atchuthan. A micro Lie theory for state estimation in robotics. arXiv:1812.01537, 2018.
+
+\bibitem{sommer2018flipped} H.~Sommer, I.~Gilitschenski, M.~Bloesch, S.~Weiss, R.~Siegwart, and J.~Nieto. Why and how to avoid the flipped quaternion multiplication. \emph{Aerospace}, 5(3):72, 2018.
+
+\bibitem{sturm2012tum} J.~Sturm, N.~Engelhard, F.~Endres, W.~Burgard, and D.~Cremers. A benchmark for the evaluation of RGB-D SLAM systems. In \emph{IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)}, 2012.
+
+\bibitem{sun2018msckfvio} K.~Sun, K.~Mohta, B.~Pfrommer, M.~Watterson, S.~Liu, Y.~Mulgaonkar, C.~J. Taylor, and V.~Kumar. Robust stereo visual inertial odometry for fast autonomous flight. \emph{IEEE Robotics and Automation Letters}, 3(2):965--972, 2018.
+
+\bibitem{trawny2005indirect} N.~Trawny and S.~I. Roumeliotis. Indirect Kalman filter for 3D attitude estimation. Technical Report 2005-002, University of Minnesota, 2005.
+
+\bibitem{umeyama1991} S.~Umeyama. Least-squares estimation of transformation parameters between two point patterns. \emph{IEEE Transactions on Pattern Analysis and Machine Intelligence}, 13(4):376--380, 1991.
+
+\bibitem{vanloan1978} C.~F. Van Loan. Computing integrals involving the matrix exponential. \emph{IEEE Transactions on Automatic Control}, 23(3):395--404, 1978.
+
+\bibitem{yang2019degenerate} Y.~Yang, P.~Geneva, K.~Eckenhoff, and G.~Huang. Degenerate motion analysis for aided INS with online spatial and temporal sensor calibration. \emph{IEEE Robotics and Automation Letters}, 4(2):2070--2077, 2019.
+
+\bibitem{zhang2018tutorial} Z.~Zhang and D.~Scaramuzza. A tutorial on quantitative trajectory evaluation for visual(-inertial) odometry. In \emph{IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)}, 2018.
+
+\end{thebibliography}

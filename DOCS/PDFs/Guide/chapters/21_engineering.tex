@@ -1,0 +1,195 @@
+\chapter{Engineering a Real-Time Estimator in C++20}
+\label{ch:engineering}
+
+\begin{objectives}
+\begin{itemize}
+  \item Understand why a real-time estimator must be deterministic, and how the project's memory tiers achieve it.
+  \item Use fixed-max-size Eigen matrices, member workspaces and allocation guards correctly.
+  \item Avoid the Eigen pitfalls that silently corrupt numbers: dangling expression templates and aliasing.
+  \item Design a test strategy in which every test can fail, and a systematic procedure for debugging a diverging filter.
+\end{itemize}
+\end{objectives}
+
+The mathematics of the previous chapters is necessary but not sufficient. An estimator that is mathematically correct can still
+miss its deadline because of an allocation, produce garbage because of an Eigen expression template, or pass all its tests because
+the tests cannot fail. This chapter collects the engineering practices that the project encodes in AGENTS.md.
+
+% ------------------------------------------------------------------------------
+\section{Determinism and the memory tiers}
+
+A flight controller consumes the estimator's output at a fixed rate. A late estimate is a wrong estimate. The main source of
+unpredictable latency in C++ is dynamic memory allocation: \code{new}, a \code{std::vector} that grows, a dynamic-size Eigen temporary. The
+allocator may take locks, search free lists or ask the operating system for pages, with latency that is usually small and
+occasionally large. The project therefore separates three tiers (AGENTS.md E4).
+
+\begin{center}\small
+\begin{tabularx}{\textwidth}{@{}l X X@{}}
+\toprule
+Tier & Scope & Rule \\
+\midrule
+Load & parsing, building event arrays, constructing the filter & allocate freely, before streaming starts \\
+Core & \code{vio\_core}, per IMU sample and per update & zero heap allocations \\
+Frontend & OpenCV tracking & may allocate, must reuse buffers; allocations are measured and logged \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Fixed-max-size matrices}
+
+The MSCKF covariance changes size as clones come and go, but never exceeds $15 + 6N_{max}$. Eigen supports exactly this case: a
+matrix whose \emph{runtime} size is dynamic but whose \emph{maximum} size is a compile-time constant. Its storage is an inline array of the
+maximum size, so resizing within the bound never allocates.
+
+\begin{lstlisting}
+inline constexpr int kMaxClones = 10;                  // decided in M10a
+inline constexpr int kMaxDim    = 15 + 6 * kMaxClones;
+
+using CovMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                                Eigen::ColMajor, kMaxDim, kMaxDim>;
+
+CovMatrix P;          // inline storage for 75 x 75 doubles, no heap
+P.resize(15, 15);     // allowed: within the compile-time maximum
+\end{lstlisting}
+
+Large workspaces ($S$, $K$, stacked $H$, temporaries for $\Phi P$) are class members, created once, rather than function-local
+variables. Function-local fixed-max matrices would not allocate either, but they would live on the stack, and several of them at
+once can exceed it (\cref{ch:cloning}).
+
+\subsection{Proving it: allocation guards}
+
+``It shouldn't allocate'' is not evidence. The project overrides the global \code{operator new} in its tests to count allocations
+(\code{tests/support/alloc\_guard.hpp}), and wraps every core hot-path test with a guard that asserts a count of zero. In debug builds,
+\code{EIGEN\_RUNTIME\_NO\_MALLOC} together with \code{Eigen::internal::set\_is\_malloc\_allowed(false)} makes Eigen itself abort on any internal
+allocation and reports where it happened. The two mechanisms are complementary: the guard catches allocations anywhere, Eigen's flag
+pinpoints those inside Eigen.
+
+% ------------------------------------------------------------------------------
+\section{Eigen pitfalls}
+
+\paragraph{Expression templates and \code{auto}.} Eigen operations return lightweight \emph{expression} objects that are evaluated
+lazily when assigned to a matrix. Storing one with \code{auto} keeps references to its operands, which may be temporaries that no
+longer exist when the expression is finally evaluated.
+
+\begin{lstlisting}
+auto bad = R * (a + b);             // expression refers to the temporary (a + b)
+Eigen::Vector3d x = bad;            // undefined behavior: the temporary is gone
+Eigen::Vector3d good = R * (a + b); // evaluated immediately into a concrete type
+\end{lstlisting}
+
+The rule is simple: never use \code{auto} with Eigen expressions (AGENTS.md E5). Name the concrete type, or call \code{.eval()} when a
+temporary really is wanted. AddressSanitizer catches many of these bugs, but not all.
+
+\paragraph{Aliasing.} Eigen assumes that the destination of a matrix product may alias its operands and evaluates products into a
+temporary. With dynamic sizes that temporary allocates. When the destination is known not to alias, \code{.noalias()} writes directly
+into it. When it does alias, the temporary is required: write into a member workspace explicitly.
+
+\begin{lstlisting}
+tmp_15xN_.noalias() = Phi * P.topRightCorner(15, nc);  // reads P, writes workspace
+P.topRightCorner(15, nc) = tmp_15xN_;                   // copy back
+P.bottomLeftCorner(nc, 15) = tmp_15xN_.transpose();     // keep symmetry
+\end{lstlisting}
+
+Coefficient-wise operations do not alias-check. \code{A = A.transpose()} is the classic bug; use \code{A.transposeInPlace()} or symmetrize
+with a workspace.
+
+\paragraph{Passing and alignment.} Pass Eigen objects by \code{const\&} (or \code{Eigen::Ref} for blocks). Do not add
+\code{EIGEN\_MAKE\_ALIGNED\_OPERATOR\_NEW}: since C++17, aligned \code{new} handles over-aligned types. The real alignment hazard is mixing
+\code{-march} or alignment-changing flags between translation units or with dependencies, which the project forbids.
+
+\paragraph{Decompositions without allocation.} Eigen's decompositions normally own their storage. Fixed-max decomposition objects held as
+members, or the in-place variants that factor a matrix in its own storage, avoid per-call allocation. Whatever the API, verify with the
+allocation guard.
+
+% ------------------------------------------------------------------------------
+\section{Time and events}
+
+\begin{lstlisting}
+using Clock = std::chrono::nanoseconds;
+struct ImuSample   { Clock t; Eigen::Vector3d gyro, accel; };
+struct ImageEvent  { Clock t; int index; };
+using SensorEvent = std::variant<ImuSample, ImageEvent /*, PoseMeasurement */>;
+
+// Delta t: subtract in integers, convert only the difference.
+const double dt = std::chrono::duration<double>(t1 - t0).count();
+\end{lstlisting}
+
+Absolute time stays in 64-bit integer nanoseconds (\cref{sec:floating}). Events form one presorted sequence built at load time, so the
+streaming loop is a single pass over contiguous memory: no priority queue, no allocation, no reordering surprises.
+
+% ------------------------------------------------------------------------------
+\section{Numerical robustness checklist}
+
+\begin{itemize}
+  \item Normalize every quaternion after every multiplicative update (propagation, injection, cloning).
+  \item Symmetrize $P$ after propagation and after every update.
+  \item Use the Joseph form; factor $S$ with Cholesky or LDL$^\mathsf{T}$; treat a failed factorization as an error to report, not to hide.
+  \item Guard every $0/0$ with Taylor branches; use $\atantwo$ for angles; handle $\Log$ near $\pi$.
+  \item Reject features with non-positive or tiny depth, poor parallax or large reprojection error before linearizing.
+  \item Count and log gate rejections and triangulation failures.
+  \item Never clamp negative eigenvalues of $P$ to hide a problem; find out why they appeared.
+  \item In debug builds, assert finiteness at module boundaries so that a \code{NaN} is caught where it is born.
+\end{itemize}
+
+% ------------------------------------------------------------------------------
+\section{Testing}
+
+\begin{keyidea}[a test must be able to fail]
+For every test, ask: would it still pass if I flipped the sign of X, transposed Y, or swapped two blocks? If yes, the test is
+decoration. Run it once against a deliberately broken implementation to make sure it fails.
+\end{keyidea}
+
+The project's test strategy layers several kinds of evidence.
+\begin{enumerate}
+  \item \textbf{Algebraic unit tests}: identities such as $\Log(\Exp(\phi)) = \phi$ at zero, tiny, generic and near-$\pi$ angles.
+  \item \textbf{Finite-difference Jacobian tests} built on $\bplus/\bminus$, at non-trivial states, with tolerances justified in a comment.
+  \item \textbf{Closed-form trajectory tests}: synthetic trajectories with analytic IMU data and convergence-order checks.
+  \item \textbf{Statistical tests}: Monte Carlo covariance checks and NEES/NIS with $\chi^2$ bounds, seeded with
+        \code{std::mt19937\_64}. Because \code{std::normal\_distribution} differs between standard libraries, never hard-code values from one
+        run; test statistical properties.
+  \item \textbf{Invariance tests}: cloning enabled versus disabled must give identical IMU estimates when no visual updates occur.
+  \item \textbf{Resource tests}: allocation guards around every core hot path.
+  \item {\sloppy\textbf{Sanitizers}: AddressSanitizer and UndefinedBehaviorSanitizer, with
+        \code{-fno-sanitize-recover=all} so that any report fails the test run.\par}
+\end{enumerate}
+
+% ------------------------------------------------------------------------------
+\section{Debugging a diverging filter}
+
+When the full system misbehaves, resist the urge to tune. Work down the layers instead.
+\begin{enumerate}
+  \item Run on \textbf{synthetic data} with exactly modeled noise. If it fails there, the bug is in the code.
+  \item Disable visual updates. Does IMU-only propagation from ground truth behave as \cref{fig:cov-growth} predicts, with errors
+        inside $3\sigma$?
+  \item Replace visual updates by \textbf{pose updates} (Milestone 6). If those are consistent, the back end is sound.
+  \item Feed the MSCKF \textbf{ground-truth feature tracks} from a synthetic scene. If that works, the problem is in the front end or the
+        calibration.
+  \item On real data, plot each residual component over time and look for bias, oscillation or outliers.
+  \item Only then adjust noise parameters, and judge the result on consistency statistics.
+\end{enumerate}
+
+\section{Going further}
+
+Once the baseline MSCKF runs, natural extensions are First-Estimates Jacobians (\cref{ch:observability}); online calibration of the
+camera-IMU extrinsics and time offset~\cite{li2013msckf2, li2014timeoffset}; stereo observations from \code{cam1}; keeping long-lived
+features as SLAM landmarks; zero-velocity updates; and evaluation on the harder EuRoC sequences (V1\_03, MH\_05) and other
+datasets. Each extension adds states and Jacobians, and each Jacobian gets its derivation and its finite-difference test.
+
+\begin{takeaways}
+\begin{itemize}
+  \item Determinism requires zero allocation in the core: fixed-max-size matrices, member workspaces, proven by allocation guards.
+  \item Never use \code{auto} with Eigen expressions; use \code{.noalias()} only when there is no aliasing.
+  \item Keep time in integer nanoseconds and process one presorted event stream.
+  \item Every test must be able to fail; layer algebraic, Jacobian, closed-form, statistical and resource tests.
+  \item Debug by removing layers until the failure disappears, not by tuning.
+\end{itemize}
+\end{takeaways}
+
+\begin{exercises}
+  \item Write a minimal allocation guard by overriding the global \code{operator new} and \code{operator delete}, and show that it detects a
+        \code{std::vector::push\_back} beyond capacity but not a fixed-max Eigen \code{resize}.
+  \item Construct an example in which \code{auto} with an Eigen expression produces wrong numbers without crashing. Does
+        AddressSanitizer report it?
+  \item Measure the time of 10\,000 covariance propagation steps with fixed-max and with fully dynamic Eigen matrices, in both build
+        presets. Explain the difference.
+  \item Take one of your Jacobian tests, break the Jacobian in three different ways, and record which breakages the test detects.
+\end{exercises}

@@ -1,0 +1,14 @@
+# Python environment for the figure scripts
+.venv/
+__pycache__/
+
+# LaTeX build products (the PDFs themselves are kept)
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz

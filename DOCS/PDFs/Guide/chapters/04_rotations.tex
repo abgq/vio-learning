@@ -1,0 +1,480 @@
+\chapter{Frames, Rotations and Quaternions}
+\label{ch:rotations}
+
+\begin{objectives}
+\begin{itemize}
+  \item Read and write frame-annotated transformations such as $R_{wb}$, $p_{wb}$ and $T_{bc}$ without
+        ambiguity, and catch frame bugs with the adjacency rule.
+  \item Derive Rodrigues' formula and understand the axis-angle (rotation vector) representation.
+  \item See exactly why Euler angles are banned from the estimator.
+  \item Work fluently with Hamilton unit quaternions, and avoid the Eigen and EuRoC ordering traps.
+  \item Derive the kinematic equations $\dot R = R\sx{\omega}$ and $\dot q = \tfrac12 q\qprod[0,\omega]$.
+\end{itemize}
+\end{objectives}
+
+% ------------------------------------------------------------------------------
+\section{Frames and notation}
+
+A \emph{frame} is an origin together with three orthonormal, right-handed axes. Three frames appear
+in this project (\cref{fig:frames}).
+
+\begin{convention}[frames, AGENTS.md C1]
+\begin{itemize}
+  \item $W$, the \textbf{world} frame: fixed, gravity-aligned with $z$ pointing up, the frame of the
+        ground truth (EuRoC calls it \code{R}). Gravity is $g_w = [0, 0, -9.81]\T~\mathrm{m/s^2}$.
+  \item $B$, the \textbf{body} frame: the IMU frame \code{imu0} (EuRoC's \code{S} in \code{imu0}).
+  \item $C$, the left \textbf{camera} frame \code{cam0}: origin at the optical center, $z$ along the
+        optical axis, $x$ to the right and $y$ down in the image.
+\end{itemize}
+$R_{wb}$ (or $q_{wb}$) maps body-frame coordinates to world-frame coordinates, $v_w = R_{wb}v_b$.
+$p_{wb}$ is the position of the origin of $B$ expressed in $W$. $v_{wb}$ is the velocity of $B$
+relative to $W$, expressed in $W$. $T_{bc} = (R_{bc}, p_{bc})$ maps camera points into the body frame,
+$p_b = R_{bc}p_c + p_{bc}$; it is \code{T\_BS} from \code{cam0/sensor.yaml}. A world-to-body rotation is
+never used as a state.
+\end{convention}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[scale=1.0]
+  % world frame
+  \coordinate (W) at (0,0);
+  \draw[frameaxis, plotorange] (W) -- ++(1.4,0) node[right] {$x_w$};
+  \draw[frameaxis, plotgreen] (W) -- ++(0.75,0.6) node[above right] {$y_w$};
+  \draw[frameaxis, plotblue] (W) -- ++(0,1.4) node[above] {$z_w$};
+  \node[below left] at (W) {$W$};
+  \draw[->, thick, black!60] (-0.6,1.0) -- ++(0,-0.8) node[midway, left] {$g$};
+  % body frame
+  \coordinate (B) at (5.2,2.2);
+  \begin{scope}[shift={(B)}, rotate=25]
+    \draw[fill=primarylight, draw=primary, rounded corners=2pt] (-0.55,-0.25) rectangle (0.55,0.25);
+    \draw[frameaxis, plotorange] (0,0) -- (1.3,0) node[right] {$x_b$};
+    \draw[frameaxis, plotgreen] (0,0) -- (0.65,0.55) node[above right] {$y_b$};
+    \draw[frameaxis, plotblue] (0,0) -- (0,1.3) node[above] {$z_b$};
+    \node[below left] at (-0.2,-0.25) {$B$ (IMU)};
+    % camera
+    \coordinate (C) at (2.0,-1.3);
+    \draw[fill=white, draw=primary] ($(C)+(-0.15,0.15)$) rectangle ($(C)+(0.15,-0.15)$);
+    \draw[frameaxis, plotblue] (C) -- ++(0,-0.9) node[below] {$z_c$};
+    \draw[frameaxis, plotorange] (C) -- ++(0.8,0) node[right] {$x_c$};
+    \draw[frameaxis, plotgreen] (C) -- ++(-0.45,-0.35) node[left] {$y_c$};
+    \node[above right] at ($(C)+(0.1,0.1)$) {$C$};
+    \draw[->, thick, conv] (0.3,-0.3) to[bend right=20] node[midway, below left=-1pt] {$T_{bc}$} ($(C)+(-0.2,0.05)$);
+  \end{scope}
+  \draw[->, thick, primary, dashed] (W) -- (B) node[midway, above left] {$p_{wb}$, $R_{wb}$};
+\end{tikzpicture}
+\caption{The world frame $W$ (gravity-aligned, $z$ up), the body/IMU frame $B$ moving with the
+vehicle, and the camera frame $C$ rigidly attached to the body through the constant extrinsic
+calibration $T_{bc}$.}
+\label{fig:frames}
+\end{figure}
+
+\subsection{Reading subscripts}
+
+The naming rule \code{<quantity>\_<to><from>} makes products self-checking. $R_{wb}$ takes a vector
+\emph{from} $B$ \emph{to} $W$. Composition chains frames like dominoes:
+\begin{equation}
+  R_{wc} = R_{wb}\,R_{bc}, \qquad v_w = R_{wb}\,R_{bc}\,v_c .
+\end{equation}
+
+\begin{keyidea}[the adjacency rule]
+In a valid product, adjacent subscripts match: $R_{w\underline{b}}\,R_{\underline{b}c}$. A product such as
+$R_{wb}R_{cb}$ has mismatched neighbors and is a bug. The fix is a transpose,
+$R_{wb}R_{cb}\T = R_{wb}R_{bc}$, since $R_{bc} = R_{cb}\inv = R_{cb}\T$. Apply the rule to every line of
+code that multiplies rotations or transforms points.
+\end{keyidea}
+
+\subsection{Active and passive views}
+
+A rotation matrix can be read in two ways. In the \emph{passive} view, $R_{wb}$ re-expresses the
+same physical vector in another frame: $v_w$ and $v_b$ are coordinates of one arrow. In the
+\emph{active} view, $R_{wb}$ rotates the world axes onto the body axes: its columns are the body
+axes $x_b, y_b, z_b$ expressed in world coordinates. Both readings are the same matrix:
+\begin{equation}
+  R_{wb} = \begin{bmatrix} x_b^{(w)} & y_b^{(w)} & z_b^{(w)} \end{bmatrix}.
+\end{equation}
+This gives a quick sanity check when debugging. The third column of $R_{wb}$ is the body $z$-axis
+in world coordinates. For a level vehicle it is $[0,0,1]\T$.
+
+% ------------------------------------------------------------------------------
+\section{Rotation matrices and \texorpdfstring{$\SO$}{SO(3)}}
+
+\begin{definition}[Special orthogonal group]
+$\SO = \{ R \in \R^{3\times3} : R\T R = I,\ \det R = +1 \}$.
+\end{definition}
+
+Orthogonality ($R\T R = I$) means $R$ preserves lengths and angles. $\det R = +1$ excludes
+reflections, which have $\det = -1$ and would turn a right-handed frame into a left-handed one. The
+set is closed under multiplication and inversion, $R\inv = R\T$, so it is a \emph{group}. A rotation
+matrix has nine entries but only three degrees of freedom, since orthonormality imposes six
+constraints. This redundancy is why $\SO$ is a curved three-dimensional surface inside $\R^9$, not a
+vector space. The sum of two rotation matrices, for example, is not a rotation matrix.
+
+The elementary rotations about the coordinate axes are
+\begin{equation}
+  R_x(\alpha) = \begin{bmatrix} 1 & 0 & 0 \\ 0 & c_\alpha & -s_\alpha \\ 0 & s_\alpha & c_\alpha \end{bmatrix},\quad
+  R_y(\alpha) = \begin{bmatrix} c_\alpha & 0 & s_\alpha \\ 0 & 1 & 0 \\ -s_\alpha & 0 & c_\alpha \end{bmatrix},\quad
+  R_z(\alpha) = \begin{bmatrix} c_\alpha & -s_\alpha & 0 \\ s_\alpha & c_\alpha & 0 \\ 0 & 0 & 1 \end{bmatrix},
+\end{equation}
+with $c_\alpha = \cos\alpha$ and $s_\alpha = \sin\alpha$. Matrix multiplication of rotations does not
+commute: $R_x(90^\circ)R_y(90^\circ) \ne R_y(90^\circ)R_x(90^\circ)$. Try it with a book.
+
+% ------------------------------------------------------------------------------
+\section{Axis-angle and Rodrigues' formula}
+
+\begin{theorem}[Euler's rotation theorem]
+Every $R\in\SO$ is a rotation by some angle $\theta \in [0, \pi]$ about some unit axis $u$, the
+eigenvector of $R$ with eigenvalue $1$.
+\end{theorem}
+
+The pair $(u, \theta)$ is the \emph{axis-angle} representation, and $\phi = \theta u \in \R^3$ is the
+\emph{rotation vector}. Its direction is the axis and its length is the angle. The rotation vector is
+the central object of the next chapter.
+
+\begin{theorem}[Rodrigues' rotation formula]
+\label{thm:rodrigues}
+The rotation by angle $\theta$ about the unit axis $u$ is
+\begin{equation}
+  R = I + \sin\theta\,\sx{u} + (1 - \cos\theta)\,\sx{u}^2
+    = \cos\theta\, I + (1-\cos\theta)\,u u\T + \sin\theta\,\sx{u}.
+  \label{eq:rodrigues}
+\end{equation}
+\end{theorem}
+\begin{proof}[Geometric proof]
+Split any vector into components parallel and perpendicular to the axis,
+$v = v_\parallel + v_\perp$ with $v_\parallel = u u\T v$. Rotation leaves $v_\parallel$ unchanged and
+rotates $v_\perp$ by $\theta$ within the plane spanned by $v_\perp$ and $u \times v_\perp = u \times v$:
+\begin{equation*}
+  Rv = v_\parallel + \cos\theta\, v_\perp + \sin\theta\, u \times v .
+\end{equation*}
+Substituting $v_\perp = v - uu\T v = -\sx{u}^2 v$ (from \eqref{eq:skew-sq} with $\|u\|=1$) and
+$u \times v = \sx{u}v$ gives $Rv = (I + \sin\theta\sx{u} + (1 - \cos\theta)\sx{u}^2)v$.
+\end{proof}
+\begin{proof}[Algebraic proof]
+The rotation about $u$ at unit angular rate satisfies $\dot R = \sx{u} R$ (\cref{sec:rot-kinematics}),
+so $R(\theta) = \exp(\theta\sx{u})$. With $\sx{u}^3 = -\sx{u}$ from \eqref{eq:skew-cube}, the
+exponential series regroups as
+\begin{equation*}
+  \exp(\theta\sx{u}) = I + \Big(\theta - \tfrac{\theta^3}{3!} + \tfrac{\theta^5}{5!} - \cdots\Big)\sx{u}
+     + \Big(\tfrac{\theta^2}{2!} - \tfrac{\theta^4}{4!} + \cdots\Big)\sx{u}^2,
+\end{equation*}
+and the two series are $\sin\theta$ and $1 - \cos\theta$.
+\end{proof}
+
+Two consequences of \eqref{eq:rodrigues} let us go back from $R$ to $(u, \theta)$. Taking the trace
+(using $\tr\sx{u} = 0$ and $\tr\sx{u}^2 = -2$) and the skew-symmetric part,
+\begin{equation}
+  \tr R = 1 + 2\cos\theta, \qquad R - R\T = 2\sin\theta\,\sx{u}.
+  \label{eq:trace-angle}
+\end{equation}
+\Cref{ch:lie} shows that \emph{how} these are combined numerically matters a great deal.
+
+% ------------------------------------------------------------------------------
+\section{Euler angles and gimbal lock}
+
+Euler angles describe a rotation as three successive rotations about coordinate axes. The aerospace
+roll-pitch-yaw ($ZYX$) convention writes
+\begin{equation}
+  R_{wb} = R_z(\psi)\,R_y(\vartheta)\,R_x(\varphi),
+\end{equation}
+with yaw $\psi$, pitch $\vartheta$ and roll $\varphi$. They are intuitive, which is why they are
+used for display. Their fatal flaw appears in the kinematics. The relation between the body angular
+velocity measured by a gyroscope and the Euler angle rates is
+\begin{equation}
+  \begin{bmatrix} \dot\varphi \\ \dot\vartheta \\ \dot\psi \end{bmatrix}
+  = \begin{bmatrix}
+      1 & \sin\varphi\tan\vartheta & \cos\varphi\tan\vartheta \\
+      0 & \cos\varphi & -\sin\varphi \\
+      0 & \sin\varphi/\cos\vartheta & \cos\varphi/\cos\vartheta
+    \end{bmatrix} \omega_b .
+  \label{eq:euler-rates}
+\end{equation}
+At $\vartheta = \pm90^\circ$, $\cos\vartheta = 0$ and the matrix blows up. Geometrically, when the
+nose points straight up, yaw and roll rotate about the same physical axis, so the three angles no
+longer describe three independent motions. This is \emph{gimbal lock}, named after mechanical
+gimbal platforms that physically jam in this configuration. Near the singularity, small angular
+velocities produce enormous Euler-angle rates, and a filter that linearizes in Euler angles becomes
+numerically meaningless.
+
+\begin{convention}[AGENTS.md C2]
+Euler angles never appear in the estimator. They may appear only in telemetry and plots.
+\end{convention}
+
+No three-parameter representation of $\SO$ is free of singularities everywhere, a topological fact
+(the space $\SO$ cannot be covered by a single chart). The solution adopted by modern estimators is to
+store attitude in a singularity-free \emph{redundant} representation (a unit quaternion or a rotation
+matrix) and to use three parameters only for \emph{small} deviations around the current estimate, where
+no singularity is near. That is the content of the next chapter.
+
+% ------------------------------------------------------------------------------
+\section{Quaternions}
+\label{sec:quaternions}
+
+\subsection{Quaternion algebra}
+
+A quaternion is a four-component number $q = w + x\,i + y\,j + z\,k$, which we write as a scalar part
+and a vector part, $q = [w,\ v]$ with $v = (x,y,z)\T$. Hamilton's multiplication rules are
+\begin{equation}
+  i^2 = j^2 = k^2 = ijk = -1, \qquad\text{hence}\qquad ij = k,\ jk = i,\ ki = j,\ ji = -k, \dots
+\end{equation}
+Expanding the product of two quaternions with these rules gives
+\begin{equation}
+  p \qprod q = \begin{bmatrix} p_w q_w - p_v\T q_v \\ p_w q_v + q_w p_v + p_v \times q_v \end{bmatrix}.
+  \label{eq:qprod}
+\end{equation}
+The cross product makes the product non-commutative. Because it is linear in each factor, it can be
+written with matrices,
+\begin{equation}
+  p\qprod q = [p]_L\, q = [q]_R\, p, \qquad
+  [p]_L = \begin{bmatrix} p_w & -p_v\T \\ p_v & p_w I + \sx{p_v} \end{bmatrix}, \quad
+  [q]_R = \begin{bmatrix} q_w & -q_v\T \\ q_v & q_w I - \sx{q_v} \end{bmatrix},
+\end{equation}
+where $q$ on the right of $[p]_L\,q$ is the 4-vector $[q_w; q_v]$. The \emph{conjugate} is
+$q^* = [w,\ -v]$, the norm is $\|q\| = \sqrt{q\qprod q^*} = \sqrt{w^2 + \|v\|^2}$, and
+$q\inv = q^*/\|q\|^2$. Products reverse under conjugation: $(p\qprod q)^* = q^*\qprod p^*$.
+
+\subsection{Unit quaternions represent rotations}
+
+\begin{theorem}[Rotation by a unit quaternion]
+\label{thm:quat-rotation}
+For a unit quaternion $q = [w, v]$, the map $a \mapsto q\qprod[0, a]\qprod q^*$ sends pure
+quaternions to pure quaternions and acts on $a$ as the rotation matrix
+\begin{equation}
+  R(q) = (w^2 - v\T v)\,I + 2\,v v\T + 2w\,\sx{v}
+  = \begin{bmatrix}
+    1 - 2(y^2 + z^2) & 2(xy - wz) & 2(xz + wy) \\
+    2(xy + wz) & 1 - 2(x^2 + z^2) & 2(yz - wx) \\
+    2(xz - wy) & 2(yz + wx) & 1 - 2(x^2 + y^2)
+  \end{bmatrix}.
+  \label{eq:quat-to-rot}
+\end{equation}
+The unit quaternion of a rotation by $\theta$ about the unit axis $u$ is
+\begin{equation}
+  q = \big[\cos(\theta/2),\ \sin(\theta/2)\,u\big].
+  \label{eq:quat-axis-angle}
+\end{equation}
+\end{theorem}
+\begin{proof}
+Expand $q\qprod[0, a]\qprod q^*$ twice with \eqref{eq:qprod}. The scalar part is $0$ and the vector part
+is $(w^2 - v\T v)a + 2(v\T a)v + 2w\, v\times a$, which is \eqref{eq:quat-to-rot}. For
+\eqref{eq:quat-axis-angle}, substitute $w = \cos\frac\theta2$, $v = \sin\frac\theta2 u$ and use the
+double-angle identities: $w^2 - v\T v = \cos\theta$, $2\sin^2\frac\theta2 = 1 - \cos\theta$ and
+$2\sin\frac\theta2\cos\frac\theta2 = \sin\theta$. The result is the second form of Rodrigues'
+formula \eqref{eq:rodrigues}.
+\end{proof}
+
+The \emph{half} angle in \eqref{eq:quat-axis-angle} is the most common source of factor-of-two bugs. It
+arises because $q$ appears twice in the sandwich product $q \qprod [0,a] \qprod q^*$.
+
+\begin{keyidea}[double cover]
+$q$ and $-q$ give the same $R(q)$, since \eqref{eq:quat-to-rot} is quadratic in $q$. Every rotation
+has exactly two unit quaternions, at opposite points of the unit sphere $S^3 \subset \R^4$. They
+correspond to rotating by $\theta$ about $u$, or by $2\pi - \theta$ about $-u$. Code that compares,
+averages, interpolates or takes logarithms of quaternions must account for this. The project
+canonicalizes to $w \ge 0$ before taking $\Log_q$ (AGENTS.md C2).
+\end{keyidea}
+
+\subsection{Composition and the Hamilton convention}
+
+With the Hamilton product, quaternion multiplication composes rotations in the same order as matrix
+multiplication:
+\begin{equation}
+  R(p \qprod q) = R(p)\,R(q), \qquad q_{wc} = q_{wb}\qprod q_{bc} \ \leftrightarrow\ R_{wc} = R_{wb}R_{bc}.
+\end{equation}
+The adjacency rule therefore applies to quaternions unchanged.
+
+Unfortunately, two incompatible quaternion conventions are in wide use. Much of the classic VIO
+literature, including the original MSCKF paper~\cite{mourikis2007msckf} and the indirect Kalman filter
+report of Trawny and Roumeliotis~\cite{trawny2005indirect}, uses the \emph{JPL} convention. Formulas
+cannot be copied between the two without translation~\cite{sommer2018flipped}.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}l X X@{}}
+\toprule
+ & \textbf{Hamilton (this project)} & \textbf{JPL} \\
+\midrule
+Multiplication rule & $ij = k$ ($ijk = -1$) & $ij = -k$ ($ijk = +1$) \\
+Component order & usually $[w, x, y, z]$ & usually $[x, y, z, w]$ \\
+Typical meaning & body-to-world (active), $q_{wb}$ & world-to-body (passive), ${}^{B}_{G}\bar q$ \\
+Composition & $q_{wc} = q_{wb}\qprod q_{bc}$ & ${}^{C}_{G}\bar q = {}^{C}_{B}\bar q\otimes{}^{B}_{G}\bar q$ \\
+Used by & Eigen, ROS, Solà~\cite{sola2017quaternion}, Ceres, Sophus & MSCKF papers, Trawny~\cite{trawny2005indirect}, NASA \\
+\bottomrule
+\end{tabularx}
+\caption{Hamilton versus JPL quaternions. The JPL product of two quaternions equals the Hamilton
+product of the same numbers in reverse order.}
+\label{tab:hamilton-jpl}
+\end{table}
+
+\begin{convention}[quaternions, AGENTS.md C2]
+Hamilton quaternions, \code{Eigen::Quaterniond}, always of unit norm, normalized after every
+multiplicative update. Never substitute JPL formulas, even when a paper you are reading uses them.
+Translate them first.
+\end{convention}
+
+\subsection{Quaternions in code and data}
+
+\begin{pitfall}[coefficient order]
+Three orderings meet at the project's input boundary:
+\begin{itemize}
+  \item \code{Eigen::Quaterniond(w, x, y, z)}: the constructor takes $w$ \emph{first};
+  \item \code{q.coeffs()}: Eigen's storage is $[x, y, z, w]$, with $w$ \emph{last};
+  \item EuRoC CSV files store \code{qw, qx, qy, qz}, with $w$ first.
+\end{itemize}
+Mapping a raw EuRoC row with \code{Eigen::Map<Quaterniond>} interprets it as $[x,y,z,w]$ and silently
+produces a different, valid-looking rotation. Always construct explicitly,
+\code{Eigen::Quaterniond(row[0], row[1], row[2], row[3])}, and cover the parser with a fixture test.
+\end{pitfall}
+
+Other Eigen facts worth knowing: \code{q * v} for a \code{Vector3d} applies $R(q)$ to $v$;
+\code{q1 * q2} is the Hamilton product; \code{q.conjugate()} is the inverse of a unit quaternion;
+\code{q.normalize()} works in place while \code{q.normalized()} returns a copy; and
+\code{q.toRotationMatrix()} evaluates \eqref{eq:quat-to-rot}.
+
+\paragraph{Normalization.} Each multiplicative update of a quaternion rounds its four components,
+so $\|q\|$ performs a slow random walk away from $1$. A non-unit quaternion inserted into
+\eqref{eq:quat-to-rot} produces a matrix that scales vectors as well as rotating them. Dividing by
+the norm after every update costs a few flops and removes the problem. Milestone 4 checks that
+$|\|q\| - 1| < 10^{-12}$ after $10^6$ updates.
+
+\paragraph{From a rotation matrix to a quaternion.} Inverting \eqref{eq:quat-to-rot} naively via
+$w = \tfrac12\sqrt{1 + \tr R}$ and $v = \frac{(R - R\T)\veeop}{4w}$ divides by a number that vanishes
+for $180^\circ$ rotations. Robust implementations (Shepperd's method, used by Eigen) first determine
+which of $w, x, y, z$ has the largest magnitude from the diagonal of $R$, compute that one with a
+square root, and obtain the other three by division by it.
+
+\paragraph{Interpolation.} Ground truth and IMU data rarely share timestamps with images. The correct
+way to interpolate between two attitudes is along the shortest great arc (SLERP), which in the notation
+of the next chapter reads
+$q(\tau) = q_0 \qprod \Exp_q\!\big(\tau\,\Log_q(q_0\inv\qprod q_1)\big)$ for $\tau\in[0,1]$.
+Component-wise linear interpolation followed by normalization is an acceptable approximation only for
+small angles.
+
+% ------------------------------------------------------------------------------
+\section{Rigid-body transformations}
+
+A rigid transformation combines a rotation and a translation. Point coordinates transform as
+\begin{equation}
+  p_w = R_{wb}\,p_b + p_{wb}
+  \quad\Longleftrightarrow\quad
+  \begin{bmatrix} p_w \\ 1 \end{bmatrix} = \underbrace{\begin{bmatrix} R_{wb} & p_{wb} \\ 0 & 1 \end{bmatrix}}_{T_{wb}}
+  \begin{bmatrix} p_b \\ 1 \end{bmatrix}.
+\end{equation}
+The $4\times4$ homogeneous matrices form the group $\SE$. Composition and inversion follow from block
+multiplication:
+\begin{equation}
+  T_{wc} = T_{wb}T_{bc} = \begin{bmatrix} R_{wb}R_{bc} & R_{wb}p_{bc} + p_{wb} \\ 0 & 1\end{bmatrix},
+  \qquad
+  T_{wb}\inv = T_{bw} = \begin{bmatrix} R_{wb}\T & -R_{wb}\T p_{wb} \\ 0 & 1 \end{bmatrix}.
+  \label{eq:se3-compose}
+\end{equation}
+The camera pose in the world therefore is $R_{wc} = R_{wb}R_{bc}$ and $p_{wc} = p_{wb} + R_{wb}p_{bc}$, and
+a world point $p_f$ has camera coordinates
+\begin{equation}
+  p_c = R_{bc}\T\big(R_{wb}\T(p_f - p_{wb}) - p_{bc}\big),
+  \label{eq:world-to-camera}
+\end{equation}
+which is the first half of the camera measurement model (AGENTS.md C6).
+
+\begin{pitfall}[points versus directions]
+Translations apply to points, not to free vectors. A velocity, a gravity vector or a bearing direction
+transforms with the rotation only, $v_w = R_{wb}v_b$. In homogeneous coordinates directions carry a $0$
+in the fourth component, which drops the translation automatically.
+\end{pitfall}
+
+% ------------------------------------------------------------------------------
+\section{Rotational kinematics}
+\label{sec:rot-kinematics}
+
+\subsection{Angular velocity}
+
+Let $R(t) = R_{wb}(t)$ describe a rotating body. Differentiating $R\T R = I$ gives
+$\dot R\T R + R\T\dot R = 0$, so $R\T\dot R$ is skew-symmetric and equals $\sx{\omega_b}$ for a unique
+vector $\omega_b$:
+\begin{equation}
+  \dot R_{wb} = R_{wb}\,\sx{\omega_b} = \sx{\omega_w}\,R_{wb}, \qquad \omega_w = R_{wb}\,\omega_b ,
+  \label{eq:rdot}
+\end{equation}
+where the second form uses \eqref{eq:skew-rot}. $\omega_b$ is the angular velocity of $B$ relative to
+$W$, expressed in $B$, and it is exactly what a strapdown gyroscope measures (up to bias and noise).
+The two forms of \eqref{eq:rdot} are the kinematic origin of the two perturbation conventions of the
+next chapter. A body-frame quantity multiplies on the right, and a world-frame quantity on the left.
+
+\begin{proposition}[Constant body rate]
+\label{prop:const-rate}
+If $\omega_b$ is constant on $[t_0, t_0 + \Dt]$, then $R(t_0 + \Dt) = R(t_0)\exp(\Dt\sx{\omega_b})$.
+\end{proposition}
+\begin{proof}
+$R(t) = R(t_0)\exp((t - t_0)\sx{\omega_b})$ satisfies \eqref{eq:rdot} by \cref{prop:matexp}, and the
+solution is unique.
+\end{proof}
+
+This exact solution is the basis of the multiplicative attitude update used in every integration
+scheme of \cref{ch:strapdown}. The body rate is held constant over the step and the incremental
+rotation is applied on the right. Note that the solution is \emph{not}
+$R(t_0) + \Dt\, R(t_0)\sx{\omega_b}$, which would leave $\SO$.
+
+\subsection{Quaternion kinematics}
+
+The quaternion counterpart of \eqref{eq:rdot} is
+\begin{equation}
+  \dot q_{wb} = \tfrac12\, q_{wb} \qprod [0,\ \omega_b],
+  \label{eq:qdot}
+\end{equation}
+with constant-rate solution $q(t_0 + \Dt) = q(t_0)\qprod\big[\cos\tfrac{\|\omega\|\Dt}{2},\
+\sin\tfrac{\|\omega\|\Dt}{2}\,\tfrac{\omega}{\|\omega\|}\big]$. To derive \eqref{eq:qdot}, compose
+$q(t + \dd t) = q(t) \qprod \dd q$, where $\dd q$ is the small body-frame rotation by
+$\omega_b\,\dd t$. By \eqref{eq:quat-axis-angle}, $\dd q = [1,\ \tfrac12\omega_b\,\dd t] + O(\dd t^2)$,
+so $q(t + \dd t) - q(t) = q\qprod[0, \tfrac12\omega_b]\,\dd t$. The factor $\tfrac12$ is the half angle
+again.
+
+\subsection{Derivatives of vectors in a rotating frame}
+
+Differentiating $v_w = R_{wb}v_b$ with \eqref{eq:rdot} gives the \emph{transport theorem}
+\begin{equation}
+  \dot v_w = R_{wb}\big(\dot v_b + \omega_b \times v_b\big).
+\end{equation}
+It is the source of Coriolis and centripetal terms when dynamics are written in a rotating frame.
+Our estimator keeps position and velocity in the (approximately inertial) world frame, so these terms
+do not appear in the state equations.
+
+\begin{remark}[Earth rotation]
+The world frame is fixed to the Earth, which rotates at $7.29\times10^{-5}$~rad/s. A gyroscope senses
+this rate on top of the vehicle's motion. For the ADIS16448 in EuRoC this is comparable to the bias
+instability and well below the noise floor over short horizons, so the project neglects it. The
+static part of the Earth rate, in the body frame, is partly absorbed by the gyro bias estimate. High-grade
+inertial navigation systems model it explicitly.
+\end{remark}
+
+\begin{takeaways}
+\begin{itemize}
+  \item $R_{wb}$ maps body coordinates to world coordinates; its columns are the body axes in the world.
+        Adjacent subscripts must match.
+  \item Every rotation is an axis-angle rotation, $R = I + \sin\theta\sx{u} + (1-\cos\theta)\sx{u}^2$.
+  \item Three-parameter representations have singularities. Euler angles stay out of the estimator.
+  \item Hamilton unit quaternions compose like matrices. $q$ and $-q$ are the same rotation, and the
+        quaternion of a rotation by $\theta$ uses $\theta/2$.
+  \item Eigen's constructor is $w$-first, its storage $w$-last, EuRoC is $w$-first.
+  \item $\dot R_{wb} = R_{wb}\sx{\omega_b}$. With constant $\omega_b$ the update
+        $R \leftarrow R\exp(\Dt\sx{\omega_b})$ is exact.
+\end{itemize}
+\end{takeaways}
+
+\begin{exercises}
+  \item Show that the columns of any $R \in \SO$ are orthonormal and that $\det R = +1$ implies the
+        third column is the cross product of the first two.
+  \item Verify $R_x(90^\circ)R_y(90^\circ) \neq R_y(90^\circ)R_x(90^\circ)$ by computing both products,
+        and describe each rotation physically.
+  \item Derive \eqref{eq:euler-rates} from $R = R_z(\psi)R_y(\vartheta)R_x(\varphi)$ and
+        $\sx{\omega_b} = R\T\dot R$.
+  \item Prove that $[p]_L[q]_R = [q]_R[p]_L$. What does this say about associativity of the quaternion
+        product?
+  \item Show that $R(-q) = R(q)$ and compute the quaternion of a $270^\circ$ rotation about $z$ in its
+        canonical form ($w \ge 0$). What rotation angle and axis does the canonical form describe?
+  \item Write a function that converts a EuRoC ground-truth row into $p_{wb}$, $q_{wb}$, $v_{wb}$, $b_g$
+        and $b_a$. Design a fixture row whose values would expose a swapped $w/z$ and swapped biases.
+  \item Given $T_{bc}$ from \code{cam0/sensor.yaml} (\cref{app:euroc}), compute the camera's optical axis
+        in body coordinates. Which way does the camera point relative to the IMU?
+  \item Show that if $\omega_b$ varies in time, $R(t) = R(0)\exp\big(\int_0^t\sx{\omega_b}\,\dd s\big)$ is
+        in general \emph{wrong}. Construct a counterexample with piecewise-constant rates (this is the
+        ``coning'' error of \cref{ch:strapdown}).
+\end{exercises}

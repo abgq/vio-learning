@@ -1,0 +1,501 @@
+\chapter{Linear Algebra for State Estimation}
+\label{ch:linalg}
+
+\begin{objectives}
+\begin{itemize}
+  \item Master the cross-product matrix $\sx{a}$ and the identities used in every Jacobian derivation.
+  \item Understand the four fundamental subspaces, especially the \emph{left nullspace} on which the
+        MSCKF rests.
+  \item Know when and why to use Cholesky, LDL$^\mathsf{T}$, QR and SVD, and why a filter should never
+        form an explicit inverse.
+  \item Use block matrices, Schur complements and the Woodbury identity fluently.
+  \item Understand the matrix exponential and floating-point arithmetic well enough to write
+        numerically robust code.
+\end{itemize}
+\end{objectives}
+
+Most of the computation in a Kalman filter is linear algebra: products of covariance matrices,
+solutions of linear systems, and factorizations. This chapter collects the tools the rest of the
+notes rely on and explains the numerical reasoning behind them. Readers fluent in numerical linear
+algebra can skim it, but should not skip \cref{sec:skew,sec:subspaces,sec:floating}.
+
+% ------------------------------------------------------------------------------
+\section{Vectors, coordinates and the cross product}
+\label{sec:skew}
+
+\subsection{Vectors versus their coordinates}
+
+A physical vector, such as a velocity or the direction of gravity, exists independently of any
+coordinate system. To compute with it we express it in a \emph{frame}: an origin plus three
+orthonormal, right-handed axes. The same physical vector $\vec{v}$ has different coordinate
+triples $v_w \in \R^3$ and $v_b \in \R^3$ in the world and body frames, and the two are related by
+a rotation matrix, $v_w = R_{wb}\,v_b$ (\cref{ch:rotations}). Confusing a vector with its
+coordinates in some frame is the root of most frame bugs. Throughout these notes, a subscript on a
+coordinate vector names the frame it is expressed in.
+
+For coordinate vectors $a, b \in \R^3$ we use the standard inner product
+$a\T b = \sum_i a_i b_i$, the Euclidean norm $\|a\| = \sqrt{a\T a}$, and the cross product
+$a \times b$. The cross product is bilinear, anti-commutative ($a \times b = -b \times a$), and
+orthogonal to both arguments. Its norm is $\|a\|\|b\|\sin\angle(a,b)$.
+
+\subsection{The cross-product (skew-symmetric) matrix}
+
+Because $a \times b$ is linear in $b$, it can be written as a matrix-vector product.
+
+\begin{definition}[Skew-symmetric matrix]
+For $a = (a_1, a_2, a_3)\T$, the \emph{cross-product matrix} of $a$ is
+\begin{equation}
+  \sx{a} = \begin{bmatrix} 0 & -a_3 & a_2 \\ a_3 & 0 & -a_1 \\ -a_2 & a_1 & 0 \end{bmatrix},
+  \qquad\text{so that}\qquad \sx{a}\, b = a \times b \quad \forall\, b \in \R^3 .
+  \label{eq:skew}
+\end{equation}
+It is skew-symmetric: $\sx{a}\T = -\sx{a}$. Conversely, every $3\times3$ skew-symmetric matrix
+$S$ equals $\sx{s}$ for the unique vector $s = (S_{32}, S_{13}, S_{21})\T$. We write
+$s = S\veeop$ for this inverse operation, the \emph{vee} map. In Lie theory, $\sx{\cdot}$ is
+also written $(\cdot)\hatop$ and called the \emph{hat} map.
+\end{definition}
+
+The following identities are used constantly in derivations. Learn to recognize them on sight.
+
+\begin{proposition}[Cross-product identities]
+\label{prop:skew-identities}
+For $a, b, c \in \R^3$ and $R \in \SO$ (a rotation matrix):
+\begin{align}
+  \sx{a}\, b &= -\sx{b}\, a, \label{eq:skew-anticomm}\\
+  \sx{a}\, a &= 0, \label{eq:skew-self}\\
+  \sx{a}^2 &= a a\T - \|a\|^2 I, \label{eq:skew-sq}\\
+  \sx{a}^3 &= -\|a\|^2 \sx{a}, \label{eq:skew-cube}\\
+  \sx{a}\sx{b} &= b a\T - (a\T b)\, I, \label{eq:skew-prod}\\
+  \sx{a \times b} &= \sx{a}\sx{b} - \sx{b}\sx{a} = b a\T - a b\T, \label{eq:skew-commutator}\\
+  \sx{R a} &= R \sx{a} R\T, \label{eq:skew-rot}\\
+  R\,(a \times b) &= (Ra) \times (Rb). \label{eq:cross-rot}
+\end{align}
+\end{proposition}
+
+\begin{proof}
+\eqref{eq:skew-anticomm} and \eqref{eq:skew-self} restate $a\times b = -b\times a$ and
+$a \times a = 0$. For \eqref{eq:skew-prod}, apply both sides to an arbitrary $c$ and use the
+``BAC--CAB'' rule $a \times (b \times c) = b\,(a\T c) - c\,(a\T b)$:
+$\sx{a}\sx{b}c = a\times(b\times c) = b a\T c - (a\T b) c$. Setting $b = a$ gives
+\eqref{eq:skew-sq}, and multiplying \eqref{eq:skew-sq} by $\sx{a}$ and using \eqref{eq:skew-self}
+gives \eqref{eq:skew-cube}. Subtracting \eqref{eq:skew-prod} from its version with $a, b$ swapped
+gives the second equality of \eqref{eq:skew-commutator}. The first follows from the Jacobi identity
+$a \times (b \times c) + b \times (c \times a) + c \times (a \times b) = 0$. For
+\eqref{eq:cross-rot}, the cross product is defined by orientation and lengths, both preserved by a
+proper rotation. Finally \eqref{eq:skew-rot} follows from \eqref{eq:cross-rot}:
+$\sx{Ra}\, c = (Ra)\times c = (Ra)\times(R R\T c) = R\big(a \times R\T c\big) = R\sx{a}R\T c$.
+\end{proof}
+
+\begin{keyidea}[moving a vector out of a cross product]
+Identity \eqref{eq:skew-anticomm} is how unknowns are isolated in Jacobian derivations. A
+perturbation appears as $\sx{\delta\theta}\,v$, and the Jacobian with respect to $\delta\theta$ is
+read off after rewriting it as $-\sx{v}\,\delta\theta$.
+\end{keyidea}
+
+Identity \eqref{eq:skew-cube} is what makes closed-form rotation formulas possible: every power of
+$\sx{a}$ reduces to a multiple of $\sx{a}$ or $\sx{a}^2$, so infinite series in $\sx{a}$ collapse
+to two terms (\cref{ch:rotations}).
+
+% ------------------------------------------------------------------------------
+\section{The four fundamental subspaces}
+\label{sec:subspaces}
+
+Let $A \in \R^{m\times n}$ have rank $r$. Four subspaces are associated with it:
+\begin{center}
+\begin{tabular}{@{}l l l l@{}}
+\toprule
+Subspace & Definition & Lives in & Dimension \\
+\midrule
+column space (range) & $\range(A) = \{Ax\}$ & $\R^m$ & $r$ \\
+nullspace & $\nullsp(A) = \{x : Ax = 0\}$ & $\R^n$ & $n - r$ \\
+row space & $\range(A\T)$ & $\R^n$ & $r$ \\
+left nullspace & $\nullsp(A\T) = \{y : y\T A = 0\}$ & $\R^m$ & $m - r$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{theorem}[Fundamental theorem of linear algebra]
+\label{thm:fundamental}
+$\nullsp(A) = \range(A\T)^\perp$ and $\nullsp(A\T) = \range(A)^\perp$. Consequently
+$\R^n = \range(A\T) \oplus \nullsp(A)$ and $\R^m = \range(A) \oplus \nullsp(A\T)$, with
+orthogonal direct sums.
+\end{theorem}
+\begin{proof}
+$y \in \nullsp(A\T) \iff A\T y = 0 \iff x\T A\T y = 0\ \forall x \iff (Ax)\T y = 0\ \forall x
+\iff y \perp \range(A)$. The first statement is the same argument applied to $A\T$.
+\end{proof}
+
+The \emph{left nullspace} deserves special attention because the MSCKF is built on it. Suppose a
+stacked measurement depends on an unwanted variable $f$ through a tall matrix $H_f \in \R^{m\times
+3}$ of full column rank:
+\begin{equation}
+  r = H_x\,\delta x + H_f\,\delta f + n .
+\end{equation}
+Take any matrix $A \in \R^{m\times(m-3)}$ whose columns form an orthonormal basis of
+$\nullsp(H_f\T)$. Then $A\T H_f = 0$, and multiplying through by $A\T$ gives
+$A\T r = A\T H_x\,\delta x + A\T n$: the unwanted variable has disappeared. \Cref{ch:msckfupdate}
+shows that no information about $\delta x$ is lost in the process.
+
+\begin{definition}[Orthogonal projector]
+A matrix $\Pi$ is an orthogonal projector if $\Pi^2 = \Pi$ and $\Pi\T = \Pi$. If the columns of
+$Q$ are an orthonormal basis of a subspace $\mathcal{S}$, the projector onto $\mathcal{S}$ is
+$\Pi_{\mathcal{S}} = Q Q\T$. If $A$ has full column rank, the projector onto $\range(A)$ is
+$A (A\T A)\inv A\T$, and $I - \Pi_{\mathcal{S}}$ projects onto $\mathcal{S}^\perp$.
+\end{definition}
+
+For the matrix $A$ spanning the left nullspace of $H_f$, these facts combine into an identity we
+will use to prove the MSCKF's optimality:
+\begin{equation}
+  A A\T = I - H_f (H_f\T H_f)\inv H_f\T .
+  \label{eq:nullspace-projector}
+\end{equation}
+
+% ------------------------------------------------------------------------------
+\section{Symmetric and positive-definite matrices}
+
+Covariance matrices are symmetric and positive semi-definite, and much of the numerical care in a
+filter goes into keeping them that way.
+
+\begin{definition}
+A symmetric matrix $P = P\T \in \R^{n\times n}$ is \emph{positive semi-definite} (PSD, $P \succeq 0$) if
+$x\T P x \ge 0$ for all $x$, and \emph{positive definite} (PD, $P \succ 0$) if $x\T P x > 0$
+for all $x \ne 0$. We write $P_1 \succeq P_2$ (the Loewner order) if $P_1 - P_2 \succeq 0$.
+\end{definition}
+
+\begin{theorem}[Spectral theorem]
+Every real symmetric matrix factors as $P = U \Lambda U\T$ with $U$ orthogonal and
+$\Lambda = \diag(\lambda_1,\dots,\lambda_n)$ real. $P \succeq 0$ if and only if all
+$\lambda_i \ge 0$, and $P \succ 0$ if and only if all $\lambda_i > 0$.
+\end{theorem}
+
+The geometric picture is an ellipsoid. For $P \succ 0$, the set $\{x : x\T P\inv x \le 1\}$ is an
+ellipsoid with principal axes along the columns of $U$ and semi-axis lengths $\sqrt{\lambda_i}$.
+This is the ``one-sigma'' uncertainty ellipsoid of a Gaussian with covariance $P$
+(\cref{ch:prob}).
+
+\begin{proposition}[Properties of PSD matrices]
+\label{prop:psd}
+Let $P, Q \succeq 0$ and let $A$ be any matrix of compatible size. Then
+\begin{enumerate}
+  \item $A P A\T \succeq 0$ (congruence preserves semi-definiteness);
+  \item $P + Q \succeq 0$, and $P + Q \succ 0$ if either is PD;
+  \item $P_{ii} \ge 0$ and $|P_{ij}| \le \sqrt{P_{ii} P_{jj}}$;
+  \item every principal submatrix of $P$ is PSD.
+\end{enumerate}
+\end{proposition}
+\begin{proof}
+(1) $x\T A P A\T x = (A\T x)\T P (A\T x) \ge 0$. (2) is immediate. (3) and (4) follow from (1) with
+$A$ a selection matrix, using the $2\times2$ determinant for the off-diagonal bound.
+\end{proof}
+
+Property (1) explains why the covariance updates $\Phi P \Phi\T + Q$ and the Joseph form
+(\cref{ch:kf}) preserve semi-definiteness exactly in exact arithmetic: they are sums of congruences
+of PSD matrices. The simpler update $(I - KH)P$ is \emph{not} a congruence, which is why it can lose
+positive semi-definiteness under rounding.
+
+% ------------------------------------------------------------------------------
+\section{Matrix factorizations}
+
+\subsection{Cholesky and LDL$^\mathsf{T}$}
+
+\begin{theorem}[Cholesky factorization]
+A symmetric matrix $S$ is positive definite if and only if $S = L L\T$ for a unique lower
+triangular $L$ with positive diagonal.
+\end{theorem}
+
+The factor is computed column by column:
+\begin{equation}
+  L_{jj} = \Big( S_{jj} - \sum_{k<j} L_{jk}^2 \Big)^{1/2}, \qquad
+  L_{ij} = \frac{1}{L_{jj}}\Big( S_{ij} - \sum_{k<j} L_{ik}L_{jk} \Big), \quad i > j,
+\end{equation}
+at a cost of about $n^3/3$ flops, half that of an LU factorization. The algorithm is backward
+stable without pivoting, and it fails (a negative argument of the square root) exactly when $S$ is
+not numerically positive definite. That makes it a useful diagnostic too. The variant
+$S = L D L\T$ with unit-diagonal $L$ and diagonal $D$ avoids square roots, and with symmetric
+pivoting (Eigen's \code{LDLT}) it also handles semi-definite matrices gracefully.
+
+Cholesky factors \emph{whiten} correlated quantities. If $n \sim \N(0, S)$ and $S = LL\T$, then
+$L\inv n \sim \N(0, I)$. This is how Mahalanobis distances are computed stably:
+$r\T S\inv r = \|L\inv r\|^2$, with one triangular solve.
+
+\subsection{QR factorization and Householder reflections}
+
+\begin{definition}[Householder reflection]
+For a nonzero $v \in \R^m$, the matrix $H_v = I - 2\, \dfrac{v v\T}{v\T v}$ reflects vectors across
+the hyperplane orthogonal to $v$. It is symmetric and orthogonal, $H_v = H_v\T = H_v\inv$.
+\end{definition}
+
+Given any $x \in \R^m$, choosing $v = x + \operatorname{sign}(x_1)\|x\|\,e_1$ gives
+$H_v x = -\operatorname{sign}(x_1)\|x\|\,e_1$: a single reflection zeroes every entry of $x$ below
+the first. (The sign choice avoids cancellation when $x$ is already nearly parallel to $e_1$.)
+Applying such reflections to the columns of $A \in \R^{m\times n}$, $m \ge n$, one after another
+produces
+\begin{equation}
+  H_n \cdots H_2 H_1\, A = \begin{bmatrix} R_1 \\ 0 \end{bmatrix}
+  \quad\Longleftrightarrow\quad
+  A = Q \begin{bmatrix} R_1 \\ 0 \end{bmatrix} = \begin{bmatrix} Q_1 & Q_2 \end{bmatrix}
+      \begin{bmatrix} R_1 \\ 0 \end{bmatrix} = Q_1 R_1,
+  \label{eq:qr}
+\end{equation}
+with $Q = H_1 H_2\cdots H_n$ orthogonal, $R_1 \in \R^{n\times n}$ upper triangular, $Q_1 \in
+\R^{m\times n}$ and $Q_2 \in \R^{m\times(m-n)}$. The cost is about $2mn^2 - \tfrac23 n^3$ flops.
+
+\begin{proposition}[Nullspaces from QR]
+\label{prop:qr-nullspace}
+If $A$ has full column rank $n$ and $A = Q_1 R_1$ as in \eqref{eq:qr}, then the columns of $Q_1$
+are an orthonormal basis of $\range(A)$ and the columns of $Q_2$ are an orthonormal basis of the
+left nullspace $\nullsp(A\T)$. In particular $Q_2\T A = 0$.
+\end{proposition}
+\begin{proof}
+$Q\T A = [R_1;\ 0]$, so $Q_2\T A = 0$. The columns of $Q_2$ are orthonormal and there are $m - n$ of
+them, which is the dimension of $\nullsp(A\T)$.
+\end{proof}
+
+\begin{implnote}[never form $Q$]
+$Q$ is $m\times m$ and dense, but it is defined by only $n$ reflection vectors. Libraries store
+those vectors compactly in the lower triangle of the factored matrix. To compute $Q\T B$ for some
+other matrix $B$, apply the $n$ reflections to $B$ one at a time, at a cost of $\mathcal{O}(mnk)$
+for $B \in \R^{m\times k}$. Forming $Q$ explicitly would cost $\mathcal{O}(m^2 n)$ and $m^2$ storage.
+In Eigen, \code{HouseholderQR::householderQ()} returns a lazy \code{HouseholderSequence} that can
+be applied to $B$ without materializing $Q$. Whether a particular call allocates must be checked
+with the allocation guard, not assumed.
+\end{implnote}
+
+A \emph{Givens rotation} zeroes a single entry by rotating two rows. It is the tool of choice when
+the matrix is already nearly triangular or very sparse. The original MSCKF paper suggests Givens
+rotations for its nullspace projection, because the feature Jacobian has a sparse block structure.
+
+\subsection{The singular value decomposition}
+
+\begin{theorem}[SVD]
+Every $A \in \R^{m\times n}$ factors as $A = U \Sigma V\T$ with $U, V$ orthogonal and $\Sigma$
+diagonal with entries $\sigma_1 \ge \sigma_2 \ge \dots \ge 0$, the \emph{singular values}.
+\end{theorem}
+
+The SVD reveals everything about $A$ at once. The rank is the number of nonzero singular values; the
+first $r$ columns of $U$ and $V$ span the column and row spaces, and the remaining columns span the
+left nullspace and the nullspace. The \emph{condition number} $\kappa(A) = \sigma_1/\sigma_n$
+measures how much relative errors in the data can be amplified in the solution of a linear system.
+The minimum-norm least-squares solution of $Ax \approx b$ is $x = A^+ b$ with the pseudo-inverse
+$A^+ = V \Sigma^+ U\T$. The SVD is the most robust of the factorizations and also the most
+expensive. In this project it appears in the linear triangulation of \cref{ch:multiview} and in
+diagnostics.
+
+% ------------------------------------------------------------------------------
+\section{Solving linear systems and least squares}
+
+\begin{pitfall}[explicit inverses]
+Formulas such as $K = P H\T S\inv$ are notation, not algorithms. Computing $S\inv$ and then
+multiplying costs about three times as much as solving, is less accurate, and destroys structure.
+Factor $S$ once (Cholesky or LDL$^\mathsf{T}$) and solve: $S K\T = H P\T$ gives $K\T$ by two
+triangular substitutions per column. Writing \code{S.ldlt().solve(Identity)} is still an explicit
+inverse in disguise.
+\end{pitfall}
+
+\paragraph{Least squares.} Given an overdetermined system $Ax \approx b$ with $A \in \R^{m\times n}$
+of full column rank, the least-squares solution minimizes $\|Ax - b\|^2$. Setting the gradient to zero
+gives the \emph{normal equations} $A\T A x = A\T b$. They are cheap but square the condition number,
+$\kappa(A\T A) = \kappa(A)^2$, which can lose half the significant digits. The QR approach is more
+stable: with $A = Q_1R_1$, $\|Ax - b\|^2 = \|R_1 x - Q_1\T b\|^2 + \|Q_2\T b\|^2$, so
+$x = R_1\inv Q_1\T b$ by back substitution, and the residual norm is $\|Q_2\T b\|$.
+
+\paragraph{Weighted least squares.} If the errors have covariance $W$, minimize
+$(Ax - b)\T W\inv (Ax - b)$. With $W = LL\T$ this is ordinary least squares on the whitened system
+$L\inv A x \approx L\inv b$.
+
+% ------------------------------------------------------------------------------
+\section{Block matrices and the Schur complement}
+
+Estimation constantly partitions vectors and matrices into blocks: IMU state versus clones, poses
+versus landmarks. Block elimination is the basic tool.
+
+\begin{proposition}[Block factorization and inverse]
+\label{prop:block-inverse}
+Let $M = \begin{bmatrix} A & B \\ C & D \end{bmatrix}$ with $A$ invertible, and define the
+\emph{Schur complement} of $A$ in $M$, $M/A := D - C A\inv B$. Then
+\begin{equation}
+  M = \begin{bmatrix} I & 0 \\ C A\inv & I \end{bmatrix}
+      \begin{bmatrix} A & 0 \\ 0 & M/A \end{bmatrix}
+      \begin{bmatrix} I & A\inv B \\ 0 & I \end{bmatrix},
+  \qquad \det M = \det A \cdot \det(M/A),
+\end{equation}
+and if $M/A$ is invertible,
+\begin{equation}
+  M\inv = \begin{bmatrix}
+    A\inv + A\inv B\, (M/A)\inv\, C A\inv & -A\inv B\, (M/A)\inv \\
+    -(M/A)\inv C A\inv & (M/A)\inv
+  \end{bmatrix}.
+\end{equation}
+\end{proposition}
+\begin{proof}
+Multiply out the three factors. The inverse is the product of the inverses of the three factors in
+reverse order, and the inverses of the unit-triangular block factors are obtained by negating their
+off-diagonal blocks.
+\end{proof}
+
+For a symmetric $M$ with $A \succ 0$: $M \succ 0$ if and only if $M/A \succ 0$. The Schur
+complement is the algebraic form of \emph{eliminating} a block of variables. \Cref{ch:prob} shows it
+is exactly Gaussian marginalization in information form and conditioning in covariance form.
+
+\begin{theorem}[Woodbury matrix identity]
+\label{thm:woodbury}
+For invertible $A$ and $C$ and conformable $U, V$,
+\begin{equation}
+  (A + U C V)\inv = A\inv - A\inv U \big( C\inv + V A\inv U \big)\inv V A\inv .
+\end{equation}
+\end{theorem}
+\begin{proof}
+Write the block matrix $\begin{bmatrix} A & U \\ V & -C\inv\end{bmatrix}$ and compute the
+top-left block of its inverse in two ways with \cref{prop:block-inverse}: eliminating $A$ first gives
+the right-hand side, and eliminating $-C\inv$ first gives $(A + UCV)\inv$.
+\end{proof}
+
+Woodbury connects the two forms of the Kalman update (\cref{ch:kf}). It says that a low-rank update
+of a matrix gives a low-rank update of its inverse, which is why an update with $m$ measurements
+needs only an $m\times m$ inverse no matter how large the state is.
+
+% ------------------------------------------------------------------------------
+\section{The matrix exponential}
+\label{sec:matexp}
+
+\begin{definition}
+For $A \in \R^{n\times n}$, $\exp(A) = \sum_{k=0}^\infty \frac{A^k}{k!} = I + A + \tfrac12 A^2 + \tfrac16 A^3 + \cdots$.
+The series converges absolutely for every $A$.
+\end{definition}
+
+\begin{proposition}[Properties of the matrix exponential]
+\label{prop:matexp}
+\begin{enumerate}
+  \item $x(t) = \exp(tA)\, x_0$ is the unique solution of $\dot x = Ax$, $x(0) = x_0$.
+  \item $\frac{\dd}{\dd t}\exp(tA) = A \exp(tA) = \exp(tA)\, A$.
+  \item $\exp(A)\inv = \exp(-A)$, and $\det\exp(A) = e^{\tr A}$.
+  \item $\exp(T A T\inv) = T \exp(A)\, T\inv$ for invertible $T$.
+  \item If $AB = BA$ then $\exp(A + B) = \exp(A)\exp(B)$. \textbf{In general this fails.}
+\end{enumerate}
+\end{proposition}
+
+The failure of property 5 for non-commuting matrices is the algebraic root of everything subtle
+about rotations: two rotations generated by $\sx{a}$ and $\sx{b}$ do not compose into the rotation
+generated by $\sx{a + b}$. \Cref{ch:lie} measures the discrepancy precisely.
+
+\begin{example}[Nilpotent generator: the double integrator]
+\label{ex:double-integrator}
+For $F = \begin{bmatrix} 0 & 1 \\ 0 & 0 \end{bmatrix}$, $F^2 = 0$, so the series terminates:
+$\exp(F\Dt) = \begin{bmatrix} 1 & \Dt \\ 0 & 1\end{bmatrix}$. This is the exact transition matrix of
+position and velocity under zero acceleration. The inertial error dynamics of \cref{ch:errordyn}
+have a similar nilpotent structure, so their exponentials can be written in closed form.
+\end{example}
+
+% ------------------------------------------------------------------------------
+\section{Derivatives and Jacobians}
+
+\begin{definition}[Jacobian layout]
+For $f: \R^n \to \R^m$, the Jacobian $\frac{\partial f}{\partial x} \in \R^{m\times n}$ has
+entries $\big[\frac{\partial f}{\partial x}\big]_{ij} = \frac{\partial f_i}{\partial x_j}$
+(numerator layout), so that $f(x + \delta) = f(x) + \frac{\partial f}{\partial x}\delta +
+o(\|\delta\|)$. Column $j$ is the sensitivity of the output to the $j$-th input direction. This
+is exactly what a finite-difference test computes column by column.
+\end{definition}
+
+With this layout the chain rule reads
+$\frac{\partial (g\circ f)}{\partial x} = \frac{\partial g}{\partial y}\big|_{y = f(x)}\frac{\partial f}{\partial x}$,
+a product of matrices in the same order as the composition. A few derivatives recur:
+\begin{equation}
+  \frac{\partial (Ax)}{\partial x} = A, \qquad
+  \frac{\partial (a \times x)}{\partial x} = \sx{a}, \qquad
+  \frac{\partial (x \times a)}{\partial x} = -\sx{a}, \qquad
+  \frac{\partial (x\T S x)}{\partial x} = x\T (S + S\T).
+\end{equation}
+\Cref{ch:lie} extends Jacobians to functions whose inputs or outputs are rotations.
+
+% ------------------------------------------------------------------------------
+\section{Floating-point arithmetic}
+\label{sec:floating}
+
+An IEEE~754 \code{double} stores a sign, an 11-bit exponent, and a 53-bit significand (52 stored
+bits plus an implicit leading one). Two constants matter:
+\begin{itemize}
+  \item the \emph{machine epsilon} $\mach = 2^{-52} \approx 2.22\times10^{-16}$, the gap between $1$
+        and the next larger double (\code{std::numeric\_limits<double>::epsilon()});
+  \item the \emph{unit roundoff} $u = 2^{-53} \approx 1.11\times10^{-16}$: every basic operation
+        satisfies $\mathrm{fl}(a \circ b) = (a\circ b)(1 + \delta)$ with $|\delta| \le u$.
+\end{itemize}
+Relative accuracy is therefore excellent for a single operation. Trouble comes from
+\emph{cancellation}: subtracting two nearly equal numbers that each carry a rounding error leaves
+a small result whose relative error can be enormous.
+
+\begin{example}[Catastrophic cancellation in $1 - \cos\theta$]
+\label{ex:cancellation}
+For $\theta = 10^{-5}$, $\cos\theta = 1 - 5\times10^{-11} + \dots$. The stored value of
+$\cos\theta$ has an absolute error up to $u \approx 10^{-16}$, so $1 - \cos\theta \approx
+5\times 10^{-11}$ is computed with relative error up to $10^{-16}/(5\times10^{-11}) \approx 2\times
+10^{-6}$. Dividing by $\theta^2$ to form $(1-\cos\theta)/\theta^2 \approx 1/2$ keeps that relative
+error. At $\theta = 10^{-8}$, $\cos\theta$ rounds to exactly $1$, and the computed value is $0$
+instead of $1/2$. The Taylor expansion $\tfrac12 - \tfrac{\theta^2}{24} + \cdots$ has no
+cancellation at all. \Cref{fig:taylor} in \cref{ch:lie} shows this effect for all the coefficient
+functions of the rotation group.
+\end{example}
+
+\begin{pitfall}[time stamps in floating point]
+EuRoC timestamps are nanoseconds since the Unix epoch, about $1.4\times10^{18}$, which lies between
+$2^{60}$ and $2^{61}$. A \code{double} near that value can only represent multiples of
+$2^{60-52} = 256$~ns. Converting absolute timestamps to \code{double} therefore quantizes them to
+256~ns, and accumulating time by repeated addition of $\Dt$ drifts further. Keep absolute time in
+64-bit integers (\code{std::chrono::nanoseconds}) and convert only differences to \code{double}
+(AGENTS.md C5).
+\end{pitfall}
+
+\paragraph{Finite-difference step size.} A finite-difference derivative is itself a cancellation.
+For the central difference $\frac{f(x+h) - f(x-h)}{2h}$, the truncation error is about
+$\frac{h^2}{6}|f'''|$ and the rounding error about $\frac{u |f|}{h}$. Their sum is minimized at
+\begin{equation}
+  h^\star = \left(\frac{3\,u\,|f|}{|f'''|}\right)^{1/3} \approx 10^{-5}\text{ to }10^{-6}
+  \quad\text{(for quantities of order one)},
+\end{equation}
+with a total error of order $u^{2/3} \approx 10^{-11}$. For the one-sided difference the optimal step
+is $\sim\sqrt{u} \approx 10^{-8}$ and the error is only $\sim 10^{-8}$. This is why Jacobian tests
+use central differences with $h \approx 10^{-6}$ and tolerances around $10^{-6}$ to $10^{-8}$, scaled
+to the magnitude of the quantities involved.
+
+\paragraph{Conditioning versus stability.} A problem is \emph{ill-conditioned} if small changes in
+its data produce large changes in its exact answer. An algorithm is \emph{unstable} if it produces
+much larger errors than the conditioning of the problem justifies. Computing the rotation angle
+from a rotation matrix with $\arccos$ near zero angle is an unstable algorithm for a
+well-conditioned problem (\cref{ch:lie}). Triangulating a point seen with almost no parallax is an
+ill-conditioned problem that no algorithm can rescue (\cref{ch:multiview}).
+
+\begin{takeaways}
+\begin{itemize}
+  \item $\sx{a}b = a\times b = -\sx{b}a$, $\sx{a}^3 = -\|a\|^2\sx{a}$, and $\sx{Ra} = R\sx{a}R\T$ are
+        the workhorses of every rotation derivation.
+  \item The left nullspace of a tall matrix is the orthogonal complement of its column space.
+        A full QR factorization delivers an orthonormal basis for it.
+  \item Covariance updates should be congruences ($APA\T$) plus PSD terms, so that positive
+        semi-definiteness is preserved structurally.
+  \item Factor and solve; never form an explicit inverse, and never form $Q$ explicitly.
+  \item Schur complements eliminate variables; Woodbury converts between large and small inverses.
+  \item Cancellation, not single operations, destroys floating-point accuracy. Time stamps belong
+        in 64-bit integers.
+\end{itemize}
+\end{takeaways}
+
+\begin{exercises}
+  \item Prove \eqref{eq:skew-commutator} directly from \eqref{eq:skew-prod}, and verify the Jacobi
+        identity numerically for random vectors.
+  \item Show that the eigenvalues of $\sx{a}$ are $0$ and $\pm i\|a\|$. Which eigenvector belongs to $0$?
+  \item Let $H_f \in \R^{2M\times3}$ have full column rank. Compute the dimension of its left
+        nullspace for $M = 2, 3, 10$. Prove \eqref{eq:nullspace-projector}.
+  \item Show that if $P\succ0$ then $P - K S K\T \succeq 0$ for $S = HPH\T + R$, $K = PH\T S\inv$
+        and $R \succ 0$. (Hint: Schur complement of a suitable $2\times2$ block matrix.)
+  \item Implement Householder QR in Python for a $10\times3$ matrix and check
+        \cref{prop:qr-nullspace} numerically. Then compare the accuracy of solving a least-squares
+        problem with $\kappa(A) = 10^8$ by the normal equations and by QR.
+  \item Use \cref{thm:woodbury} to show that
+        $\big(P\inv + H\T R\inv H\big)\inv = P - PH\T(HPH\T + R)\inv HP$. Which side is cheaper to
+        evaluate when $P$ is $75\times75$ and $R$ is $2\times2$? When $R$ is $500\times500$?
+  \item What is the spacing of doubles near $2^{30}$ seconds expressed in nanoseconds? Would storing
+        time as \code{double} seconds since the epoch be acceptable for a 200~Hz IMU?
+  \item For $f(x) = \sin x$ at $x = 1$, plot the error of forward and central differences versus
+        $h \in [10^{-16}, 10^{-1}]$ on log axes and locate the optimal step sizes. Compare with the
+        formulas above.
+\end{exercises}

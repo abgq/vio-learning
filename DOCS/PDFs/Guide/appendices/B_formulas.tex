@@ -1,0 +1,93 @@
+\chapter{Formula Sheet}
+\label{app:formulas}
+
+Every formula below follows the project conventions (Hamilton quaternions, local perturbations) and was verified numerically. Let
+$\theta = \|\phi\|$.
+
+\section*{Cross products}
+\begin{gather*}
+  \sx{a}b = a\times b = -\sx{b}a, \qquad \sx{a}\T = -\sx{a}, \qquad \sx{a}^2 = aa\T - \|a\|^2I, \qquad \sx{a}^3 = -\|a\|^2\sx{a}, \\
+  \sx{a}\sx{b} = ba\T - (a\T b)I, \qquad \sx{a\times b} = \sx{a}\sx{b} - \sx{b}\sx{a}, \qquad \sx{Ra} = R\sx{a}R\T .
+\end{gather*}
+
+\section*{Exponential and logarithm}
+\begin{gather*}
+  \Exp(\phi) = I + \frac{\sin\theta}{\theta}\sx{\phi} + \frac{1 - \cos\theta}{\theta^2}\sx{\phi}^2, \qquad
+  \Exp_q(\phi) = \Big[\cos\tfrac\theta2,\ \tfrac{\sin(\theta/2)}{\theta}\phi\Big], \\
+  \theta = \atantwo\big(\tfrac12\|(R - R\T)\veeop\|,\ \tfrac12(\tr R - 1)\big), \qquad
+  \Log(R) = \frac{\theta}{2\sin\theta}(R - R\T)\veeop \quad (0 < \theta < \pi), \\
+  \text{near }\pi:\ uu\T = \frac{\tfrac12(R + R\T) - \cos\theta\,I}{1 - \cos\theta}, \qquad
+  \Log_q(q) = 2\atantwo(\|v\|, w)\frac{v}{\|v\|}\ \text{ after } w \ge 0 .
+\end{gather*}
+
+\section*{Coefficient functions and their series}
+\begin{center}\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+Function & Closed form & Series \\
+\midrule
+$A(\theta)$ & $\sin\theta/\theta$ & $1 - \theta^2/6 + \theta^4/120$ \\
+$B(\theta)$ & $(1 - \cos\theta)/\theta^2$ & $1/2 - \theta^2/24 + \theta^4/720$ \\
+$C(\theta)$ & $(\theta - \sin\theta)/\theta^3$ & $1/6 - \theta^2/120 + \theta^4/5040$ \\
+$D(\theta)$ & $1/\theta^2 - \cot(\theta/2)/(2\theta)$ & $1/12 + \theta^2/720 + \theta^4/30240$ \\
+$\cos(\theta/2)$ & & $1 - \theta^2/8 + \theta^4/384$ \\
+$\sin(\theta/2)/\theta$ & & $1/2 - \theta^2/48 + \theta^4/3840$ \\
+$\theta/\sin\theta$ & & $1 + \theta^2/6 + 7\theta^4/360$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{Jacobians of \texorpdfstring{$\SO$}{SO(3)}}
+\begin{gather*}
+  \Jr(\phi) = I - B\,\sx{\phi} + C\,\sx{\phi}^2, \qquad \Jrinv(\phi) = I + \tfrac12\sx{\phi} + D\,\sx{\phi}^2, \\
+  \Jl(\phi) = \Jr(-\phi) = \Jr(\phi)\T = \Exp(\phi)\Jr(\phi), \qquad \Jr(\phi) = \int_0^1\Exp(-s\phi)\,\dd s, \\
+  \Exp(\phi + \delta) \approx \Exp(\phi)\Exp(\Jr(\phi)\delta), \qquad
+  \Log(\Exp(\phi)\Exp(\delta)) \approx \phi + \Jrinv(\phi)\delta, \\
+  R\Exp(\phi)R\T = \Exp(R\phi), \qquad \Log(\Exp(a)\Exp(b)) = a + b + \tfrac12 a\times b + \cdots
+\end{gather*}
+
+\section*{Elementary Jacobians (local perturbation \texorpdfstring{$R\Exp(\delta\theta)$}{R Exp(dtheta)})}
+\begin{center}\small
+\begin{tabular}{@{}l l@{\qquad}l l@{}}
+\toprule
+$Rv$ & $-R\sx{v}$ & $R\inv$ & $-R$ \\
+$R\T v$ & $\sx{R\T v}$ & $R_1R_2$ & $R_2\T$ (w.r.t.\ $R_1$), $I$ (w.r.t.\ $R_2$) \\
+$\Exp(\phi)$ & $\Jr(\phi)$ & $\Log(R)$ & $\Jrinv(\Log R)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{Quaternions}
+\begin{gather*}
+  p\qprod q = \big[p_wq_w - p_v\T q_v,\ \ p_wq_v + q_wp_v + p_v\times q_v\big], \qquad
+  R(q) = (w^2 - v\T v)I + 2vv\T + 2w\sx{v}, \\
+  \dot q = \tfrac12 q\qprod[0, \omega_b], \qquad \dot R = R\sx{\omega_b}, \qquad R(p\qprod q) = R(p)R(q).
+\end{gather*}
+
+\section*{Kalman filter}
+\begin{gather*}
+  P \gets \Phi P\Phi\T + Q_d, \qquad \Phi \approx I + F_c\Dt, \qquad Q_d \approx G_cQ_cG_c\T\Dt, \\
+  r = z\bminus h(\hat x), \quad H = \tfrac{\partial}{\partial\delta x}\big[h(\hat x\bplus\delta x)\bminus h(\hat x)\big]_0, \quad
+  S = HPH\T + R_z, \quad K = PH\T S\inv, \\
+  P \gets (I - KH)P(I - KH)\T + KR_zK\T, \qquad \hat x \gets \hat x\bplus Kr, \qquad P \gets GPG\T,\ G_\theta = I - \tfrac12\sx{\delta\hat\theta}.
+\end{gather*}
+
+\section*{Strapdown propagation with constant inputs (\texorpdfstring{$\phi = \hat\omega\Dt$}{phi = omega dt})}
+\begin{gather*}
+  R_{k+1} = R_k\Exp(\phi), \qquad v_{k+1} = v_k + g\Dt + R_k\Dt\Jl(\phi)\hat a, \\
+  p_{k+1} = p_k + v_k\Dt + \tfrac12g\Dt^2 + R_k\Dt^2N(\phi)\hat a, \\
+  N(\phi) = \tfrac12I + \frac{\theta - \sin\theta}{\theta^3}\sx{\phi} + \frac{\theta^2/2 + \cos\theta - 1}{\theta^4}\sx{\phi}^2 .
+\end{gather*}
+
+\section*{Noise}
+\begin{gather*}
+  \sigma_d = \sigma/\sqrt\Dt\ \ \text{(white, per sample)}, \qquad \sigma_{b,d} = \sigma_b\sqrt\Dt\ \ \text{(random walk, per step)}, \\
+  \Var(m\text{-fold integral of white noise}) = \sigma^2\frac{t^{2m-1}}{(2m-1)((m-1)!)^2}, \\
+  1\ ^\circ/\sqrt{\mathrm h} = 2.909\times10^{-4}~\mathrm{rad/s/\sqrt{Hz}} .
+\end{gather*}
+
+\section*{Geometry}
+\begin{gather*}
+  \bar x_2\T\sx{t}R\bar x_1 = 0, \qquad \frac{\partial\pi}{\partial p_c} = \frac1Z\begin{bmatrix} 1 & 0 & -X/Z \\ 0 & 1 & -Y/Z\end{bmatrix}, \\
+  \sigma_Z \approx \sqrt2\frac{Z^2}{b}\sigma_{uv}, \qquad N_{\mathrm{RANSAC}} = \frac{\log(1-p)}{\log(1 - w^s)} .
+\end{gather*}
