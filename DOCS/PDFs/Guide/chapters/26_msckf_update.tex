@@ -1,0 +1,294 @@
+\chapter{The MSCKF Visual Update}
+\label{ch:msckfupdate}
+
+\begin{objectives}
+\begin{itemize}
+  \item Build the linearized measurement model of a feature track over the clones that observed it.
+  \item Eliminate the feature by left-nullspace projection, and prove that no information about the poses is lost.
+  \item Compute the projection efficiently with Householder reflections.
+  \item Gate features, stack them, compress the stack with QR, and apply the update to the IMU state and all clones.
+\end{itemize}
+\end{objectives}
+
+% ------------------------------------------------------------------------------
+\section{A feature track}
+
+A feature $j$ has been observed at the clones $\mathcal{S}_j = \{i_1, \dots, i_M\}$, with undistorted normalized observations
+$z_{j,i}$. The update is triggered when the track is lost or when its oldest observation's clone is about to be marginalized,
+and requires $M \ge 3$ (AGENTS.md F5). The first step is to estimate the feature position $\hat p_f$ in the world frame by
+triangulation from the clone camera poses
+\begin{equation}
+  \hat R_{wc_i} = \hat R_{wb_i}R_{bc}, \qquad \hat p_{wc_i} = \hat p_{wb_i} + \hat R_{wb_i}p_{bc},
+\end{equation}
+using the linear initialization and Gauss--Newton refinement of \cref{sec:triangulation}, with the positive-depth, parallax and
+reprojection checks. Features that fail are discarded.
+
+% ------------------------------------------------------------------------------
+\section{Residuals and Jacobians}
+
+For each observation, the predicted measurement uses the clone estimate and the triangulated point,
+\begin{equation}
+  \hat p_{c_i} = R_{bc}\T\big(\hat R_{wb_i}\T(\hat p_f - \hat p_{wb_i}) - p_{bc}\big), \qquad
+  r_{j,i} = z_{j,i} - \pi(\hat p_{c_i}) .
+\end{equation}
+Linearizing with respect to the error state $\delta x$ (IMU and clones) and the feature position error $\delta p_f = p_f - \hat p_f$,
+\begin{equation}
+  r_{j,i} \approx H_{x,ji}\,\delta x + H_{f,ji}\,\delta p_f + n_{j,i}, \qquad n_{j,i} \sim \N(0, \sigma_{uv}^2I_2).
+\end{equation}
+The structure of these Jacobians follows from the chain rule
+\begin{equation}
+  H_{x,ji} = \frac{\partial\pi}{\partial p_c}\Big|_{\hat p_{c_i}}\frac{\partial p_{c_i}}{\partial\delta x},\qquad
+  H_{f,ji} = \frac{\partial\pi}{\partial p_c}\Big|_{\hat p_{c_i}}\frac{\partial p_{c_i}}{\partial p_f},
+\end{equation}
+with the projection Jacobian of \cref{prop:proj-jacobian}. The observation at clone $i$ depends only on that clone's pose, so
+$H_{x,ji}$ is zero except in the six columns of $(\delta p_i, \delta\theta_i)$. In particular it is zero in all IMU columns.
+
+\begin{derivex}{the visual measurement Jacobians $H_{x,ji}$ and $H_{f,ji}$}{sol:Hcam}
+With $p_{c_i} = R_{bc}\T\big(R_{wb_i}\T(p_f - p_{wb_i}) - p_{bc}\big)$, the local perturbation $R_{wb_i} = \hat R_{wb_i}\Exp(\delta\theta_i)$ and
+$p_{wb_i} = \hat p_{wb_i} + \delta p_i$:
+\begin{enumerate}
+  \item Derive $\partial p_{c_i}/\partial\delta\theta_i$ with the inverse-action row of \cref{tab:jacobians}. Be careful about which
+        vector the rotation acts on.
+  \item Derive $\partial p_{c_i}/\partial\delta p_i$ and $\partial p_{c_i}/\partial p_f$. How are they related, and why does that make physical sense?
+  \item Multiply by $\partial\pi/\partial p_c$ and place the blocks in the frozen column layout. State the sparsity pattern of the stacked
+        $H_{x,j}$.
+\end{enumerate}
+\textbf{Check:} Milestone 10b requires finite-difference tests of the projection Jacobians with respect to the clone
+$\delta p$, the clone $\delta\theta$ and $p_f$, at a non-trivial clone pose with non-trivial extrinsics.
+\end{derivex}
+
+Stacking the $M$ observations of feature $j$,
+\begin{equation}
+  r_j \approx H_{x,j}\,\delta x + H_{f,j}\,\delta p_f + n_j, \qquad
+  r_j, n_j \in \R^{2M},\quad H_{x,j} \in \R^{2M\times(15+6N)},\quad H_{f,j} \in \R^{2M\times3}.
+  \label{eq:stacked-feature}
+\end{equation}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[scale=0.42]
+  % H_x
+  \draw[black!40] (0,0) rectangle (15,-10);
+  \fill[black!8] (0,0) rectangle (3.75,-10);
+  \node[font=\scriptsize] at (1.875,0.6) {IMU (15)};
+  \foreach \k in {0,...,4} {
+    \fill[primary!70] ({3.75 + 1.5*(\k+2)}, {-2*\k}) rectangle ({3.75 + 1.5*(\k+3)}, {-2*\k-2});
+  }
+  \foreach \k in {0,...,6} \draw[black!25] ({3.75 + 1.5*\k}, 0) -- ({3.75 + 1.5*\k}, -10);
+  \node[font=\scriptsize] at (9.4,0.6) {clones (6 columns each)};
+  \node[font=\small] at (7.5,-11) {$H_{x,j}$};
+  % H_f
+  \draw[black!40] (16.5,0) rectangle (18,-10);
+  \fill[plotgreen!70] (16.5,0) rectangle (18,-10);
+  \node[font=\small] at (17.25,-11) {$H_{f,j}$};
+  % r
+  \draw[black!40] (19.5,0) rectangle (20.2,-10);
+  \fill[plotorange!60] (19.5,0) rectangle (20.2,-10);
+  \node[font=\small] at (19.85,-11) {$r_j$};
+  \draw[decorate, decoration={brace, amplitude=4pt}] (-0.4,-10) -- (-0.4,0) node[midway, left=4pt, font=\scriptsize] {$2M$ rows};
+\end{tikzpicture}
+\caption{Sparsity of the stacked feature Jacobian for a feature seen by five consecutive clones. Each pair of rows depends
+on one clone; the IMU columns are zero. $H_{f,j}$ is dense.}
+\label{fig:hx-sparsity}
+\end{figure}
+
+\section{The problem with the feature}
+
+\Cref{eq:stacked-feature} cannot be used directly in an update. The feature error $\delta p_f$ is not part of the state, so there is
+nothing to correct. Worse, $\hat p_f$ was computed from the same measurements $z_{j,i}$ and the same clone estimates, so its error is
+correlated with both $n_j$ and $\delta x$ in a way the filter's covariance does not describe. Treating $\hat p_f$ as known would
+double count the measurements. EKF-SLAM resolves this by putting $p_f$ in the state. The MSCKF eliminates it.
+
+% ------------------------------------------------------------------------------
+\section{Left-nullspace projection}
+\index{left-nullspace projection}\index{MSCKF!visual update}
+
+$H_{f,j}$ is a tall $2M\times3$ matrix. If the feature is well triangulated it has full column rank 3, and its left nullspace
+has dimension $2M - 3$ (\cref{sec:subspaces}). Let $A_j \in \R^{2M\times(2M-3)}$ have orthonormal columns spanning
+$\nullsp(H_{f,j}\T)$, so that $A_j\T H_{f,j} = 0$ and $A_j\T A_j = I$. Multiplying \eqref{eq:stacked-feature} by $A_j\T$,
+\begin{equation}
+  r_{o,j} := A_j\T r_j \approx \underbrace{A_j\T H_{x,j}}_{H_{o,j}}\,\delta x + \underbrace{A_j\T H_{f,j}}_{=\,0}\,\delta p_f + A_j\T n_j
+  = H_{o,j}\,\delta x + n_{o,j} .
+  \label{eq:projected}
+\end{equation}
+The feature has disappeared, and the projected noise is still white with the same variance:
+$\Cov(n_{o,j}) = \sigma_{uv}^2A_j\T A_j = \sigma_{uv}^2 I_{2M-3}$. \Cref{eq:projected} is a standard EKF measurement of the state alone,
+of dimension $2M - 3$.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[scale=1.0]
+  \fill[plotgreen!15] (-2.8,-0.9) -- (1.8,-0.9) -- (3.0,0.9) -- (-1.6,0.9) -- cycle;
+  \node[plotgreen!60!black, font=\footnotesize, align=center] at (-1.6,-0.55) {$\range(H_f)$: residual directions\\ explainable by moving the feature};
+  \draw[->, thick, primary] (0,0) -- (0,2.6) node[above, font=\footnotesize] {$\nullsp(H_f\T)$: what only the poses can explain};
+  \draw[->, very thick, plotorange] (0,0) -- (1.6,1.9) node[right, font=\footnotesize] {$r_j$};
+  \draw[dashed, black!50] (1.6,1.9) -- (0,1.9);
+  \draw[->, very thick, conv] (0,0) -- (0,1.9) node[left, font=\footnotesize] {$A_jA_j\T r_j$};
+  \draw[dashed, black!50] (1.6,1.9) -- (1.6,0.0);
+  \fill (0,0) circle (1.5pt);
+\end{tikzpicture}
+\caption{Geometry of the nullspace projection. Residual components inside the column space of $H_f$ can be absorbed by an
+adjustment of the unknown feature position, so they say nothing about the poses. The component orthogonal to it, in the
+left nullspace, cannot be explained by any feature position and must be explained by the poses.}
+\label{fig:nullspace}
+\end{figure}
+
+\begin{theorem}[Nullspace projection loses no information]
+\label{thm:nullspace-optimal}
+Suppose $\delta p_f$ has no prior information and $H_{f,j}$ has full column rank. Then the information about $\delta x$ in the
+projected measurement \eqref{eq:projected} equals the information about $\delta x$ in \eqref{eq:stacked-feature} after $\delta p_f$ is marginalized
+out:
+\begin{equation}
+  H_{o,j}\T H_{o,j} = H_{x,j}\T\Big(I - H_{f,j}(H_{f,j}\T H_{f,j})\inv H_{f,j}\T\Big)H_{x,j},
+\end{equation}
+and likewise for the information vectors $H_{o,j}\T r_{o,j}$. The two formulations therefore produce identical updates.
+\end{theorem}
+\begin{proof}
+The joint information matrix of $(\delta x, \delta p_f)$ contributed by \eqref{eq:stacked-feature} is
+$\sigma^{-2}\begin{bmatrix} H_x\T H_x & H_x\T H_f \\ H_f\T H_x & H_f\T H_f\end{bmatrix}$. Marginalizing $\delta p_f$ in information form is the Schur
+complement (\cref{thm:gauss-cond}), $\sigma^{-2}\big(H_x\T H_x - H_x\T H_f(H_f\T H_f)\inv H_f\T H_x\big)$, and by the projector identity
+\eqref{eq:nullspace-projector}, $I - H_f(H_f\T H_f)\inv H_f\T = A A\T$. The same algebra applies to the information vector
+$\sigma^{-2}H_x\T(I - H_f(H_f\T H_f)\inv H_f\T)r$.
+\end{proof}
+
+An equivalent way to see this: complete $A_j$ to an orthogonal matrix $Q = [Q_1\ \ A_j]$. Multiplying by $Q\T$ splits the equations
+into three that involve $\delta p_f$ (through the invertible $3\times3$ matrix $Q_1\T H_f$) and $2M - 3$ that do not. Since $\delta p_f$ is free,
+the first three can always be satisfied by choosing $\delta p_f$, so they carry no information about $\delta x$. The rest carry all
+of it.
+
+\begin{worked}[what survives the projection for two views]
+Let two cameras with identity orientation observe a point straight ahead of the first, $p_f = (0, 0, Z)$, the second camera being displaced sideways by $b$. In
+camera coordinates the point is at $(0, 0, Z)$ and $(-b, 0, Z)$, and by \cref{prop:proj-jacobian} the feature Jacobian (the derivative of the four image coordinates with
+respect to $p_f$) is
+\begin{equation*}
+  H_f = \frac1Z\begin{bmatrix} 1 & 0 & 0 \\ 0 & 1 & 0 \\ 1 & 0 & b/Z \\ 0 & 1 & 0 \end{bmatrix}.
+\end{equation*}
+A vector $a$ in its left nullspace must satisfy $a_1 + a_3 = 0$, $a_2 + a_4 = 0$ and $a_3b/Z = 0$, so $a = (0, 1, 0, -1)/\sqrt2$. The projected residual is
+$r_o = (r_{1,y} - r_{2,y})/\sqrt2$: \emph{the point must appear at the same height in both images}. That is the epipolar constraint for a sideways baseline, the condition that
+stereo rectification exploits. The two horizontal residuals are absorbed by the unknown lateral position and depth (through the disparity), and one vertical
+residual by the unknown height; only the difference of heights says anything about the cameras.
+\end{worked}
+
+\begin{remark}[how many observations]
+Two observations ($M = 2$) leave $2M - 3 = 1$ constraint, the epipolar constraint between two clones, as the example shows. It is weak and
+sensitive to triangulation error, so the project requires $M \ge 3$ (AGENTS.md F5), which gives at least three constraints and
+a better-conditioned triangulation. If the triangulation is poor (low parallax), $H_{f,j}$ is close to rank-deficient, the
+projection is ill-defined, and the feature should have been rejected by the triangulation checks.
+\end{remark}
+
+\subsection{Computing the projection}
+
+$A_j$ is never formed. By \cref{prop:qr-nullspace}, the last $2M - 3$ columns of the $Q$ factor of a full QR decomposition of $H_{f,j}$
+span its left nullspace. Householder QR of the $2M\times3$ matrix $H_{f,j}$ uses exactly three reflections. Applying the same three
+reflections to $H_{x,j}$ and $r_j$, and keeping the last $2M - 3$ rows of the results, gives $H_{o,j}$ and $r_{o,j}$ directly:
+
+\begin{algorithm}[h]
+\caption{Left-nullspace projection by Householder reflections}
+\label{alg:nullspace-householder}
+\begin{algorithmic}[1]
+\Require $H_f \in \R^{m\times3}$ ($m = 2M$), $H_x \in \R^{m\times k}$ (only the non-zero clone columns), $r \in \R^m$, stored side by side as $[H_f\ |\ H_x\ |\ r]$
+\For{$c = 1, 2, 3$}
+  \State $x \gets$ entries $c, \dots, m$ of column $c$ of $H_f$
+  \State $v \gets x$; \quad $v_1 \gets v_1 + \operatorname{sign}(x_1)\|x\|$ \Comment{\cref{ch:numlinalg}}
+  \State apply $I - 2vv\T/(v\T v)$ to rows $c, \dots, m$ of every column of $[H_f\ |\ H_x\ |\ r]$
+\EndFor
+\State $H_o \gets$ rows $4, \dots, m$ of $H_x$; \quad $r_o \gets$ rows $4, \dots, m$ of $r$ \Comment{rows $4..m$ of $H_f$ are now zero}
+\end{algorithmic}
+\end{algorithm}
+
+The cost is $\mathcal{O}(M\cdot k)$ for $k$ columns, and only the $6M$ non-zero clone columns of $H_{x,j}$ need processing. Givens rotations achieve the
+same with finer control over sparsity and were suggested in the original paper. Milestone 10b checks
+$\|A\T H_f\| < 10^{-10}$ and the orthonormality of $A$ in a test, where forming $A$ explicitly is acceptable.
+
+% ------------------------------------------------------------------------------
+\section{Gating, stacking and compression}
+
+\paragraph{Per-feature gating.} Each projected residual is gated before it is accepted (AGENTS.md F5):
+\begin{equation}
+  \gamma_j = r_{o,j}\T\big(H_{o,j}PH_{o,j}\T + \sigma_{uv}^2I\big)\inv r_{o,j} < \chi^2_{0.95}(2M - 3).
+\end{equation}
+This rejects tracks that passed the front end's checks but are inconsistent with the filter's current belief: tracks on moving
+objects, slowly drifting tracks, and features with wrong associations.
+
+\paragraph{Stacking.} The accepted features are stacked into one measurement,
+\begin{equation}
+  r_o = H_o\,\delta x + n_o, \qquad r_o \in \R^d,\quad d = \sum_j (2M_j - 3),
+\end{equation}
+with the number of rows capped at a compile-time maximum so that the stacked workspace is fixed-size. With 50 features of 6
+observations each, $d = 450$, much larger than the state dimension $n = 75$.
+
+\paragraph{QR compression.}\index{measurement compression} When $d > n$, the update can be made cheaper without approximation.
+
+\begin{proposition}[Measurement compression]
+\label{prop:compression}
+Let $H_o = Q_1T_H$ be a thin QR decomposition, with $T_H \in \R^{n\times n}$ upper triangular, and define $r_n = Q_1\T r_o$. Then the
+measurement $r_n = T_H\,\delta x + n_n$ with $n_n \sim \N(0, \sigma_{uv}^2I_n)$ yields exactly the same update as $(r_o, H_o)$.
+\end{proposition}
+\begin{proof}
+The update depends on the measurement only through the information $H_o\T H_o/\sigma^2$ and the information vector $H_o\T r_o/\sigma^2$
+(\cref{eq:kf-info}). Since $Q_1\T Q_1 = I$, $T_H\T T_H = H_o\T Q_1Q_1\T H_o = H_o\T H_o$ (as $Q_1Q_1\T$ projects onto $\range(H_o)$, which contains
+the columns of $H_o$), and $T_H\T r_n = H_o\T Q_1Q_1\T r_o = H_o\T r_o$. The discarded components $Q_2\T r_o$ are pure noise, independent of $\delta x$.
+\end{proof}
+
+Compression reduces the innovation covariance from $d\times d$ to at most $n\times n$, and the Joseph update from
+$\mathcal{O}(dn^2 + d^3)$ to $\mathcal{O}(n^3)$ after an $\mathcal{O}(dn^2)$ QR. Only the non-zero columns of $H_o$ (the clone columns) need to
+take part in the decomposition. Compression is optional in the project (AGENTS.md F5); it is worthwhile when $d \gg n$.
+
+% ------------------------------------------------------------------------------
+\section{The update}
+
+The stacked (and possibly compressed) measurement is applied with the generic update of \cref{ch:updates}: $S = HPH\T +
+\sigma_{uv}^2I$, gain by Cholesky solve, Joseph form, then injection into the IMU state and \emph{every} clone, normalization of every
+touched quaternion, and the reset with one $I - \tfrac12\sx{\delta\hat\theta_i}$ block per attitude. Corrections to the clones are
+real: they improve the poses that future features will be triangulated from.
+
+\begin{algorithm}[t]
+\caption{MSCKF visual update}
+\label{alg:msckf-update}
+\begin{algorithmic}[1]
+\Require filter state with clones, set of feature tracks ready for update
+\State $d \gets 0$
+\For{each ready feature $j$ with $M_j \ge 3$ observations}
+  \State triangulate $\hat p_f$ (linear + Gauss--Newton); \textbf{if} checks fail \textbf{then} discard, \textbf{continue}
+  \State build $r_j$, $H_{x,j}$ (clone columns only), $H_{f,j}$
+  \State apply Householder QR of $H_{f,j}$ to $[H_{x,j}\ \ r_j]$; keep rows $4\dots2M_j$ $\to$ $H_{o,j}$, $r_{o,j}$
+  \If{$\gamma_j < \chi^2_{0.95}(2M_j - 3)$ \textbf{and} $d + 2M_j - 3 \le d_{max}$}
+    \State append $H_{o,j}$, $r_{o,j}$ to the stacked workspace; $d \gets d + 2M_j - 3$
+  \Else \State count the rejection \EndIf
+  \State mark the track's observations as consumed
+\EndFor
+\If{$d > 0$}
+  \State optionally compress with QR if $d > n$
+  \State EKF update (Joseph), inject into IMU and all clones, normalize, reset with $G$
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+
+\begin{projectlink}[Milestone 10b]
+The exit criteria test every link of \cref{alg:msckf-update}: projection Jacobians by finite differences; triangulation exact on
+noise-free data and bounded under noise, rejecting negative-depth and low-parallax features; $\|A\T H_f\| < 10^{-10}$ with
+orthonormal $A$; a full synthetic VIO run without divergence, with NEES reported (yaw inconsistency expected and documented);
+zero allocations with fixed-max workspaces; and MH\_01 end to end with ATE reported.
+\end{projectlink}
+
+\begin{takeaways}
+\begin{itemize}
+  \item Each observation depends on one clone; $H_{x,j}$ is zero in the IMU columns and dense in the feature's $H_{f,j}$.
+  \item Projecting onto the left nullspace of $H_{f,j}$ removes the feature, keeps the noise white, and loses no information about
+        the poses (it equals Schur-complement marginalization).
+  \item Three Householder reflections applied to $[H_{x,j}\ r_j]$ compute the projection without forming $A_j$.
+  \item Gate each feature with $\chi^2_{0.95}(2M - 3)$, stack, compress with QR if $d > n$, and update IMU and clones together.
+\end{itemize}
+\end{takeaways}
+
+\begin{exercises}
+  \item Verify \cref{thm:nullspace-optimal} numerically: compare the posterior covariance of $\delta x$ from the projected update with
+        that from an update of the augmented state $(\delta x, \delta p_f)$ with a very large prior on $\delta p_f$.
+  \item Show that the three discarded rows $Q_1\T r_j$ determine the correction to $\hat p_f$ given $\delta x$. How would you recover an
+        updated feature estimate if you wanted one?
+  \item For $M = 2$, compute $A_j$ explicitly and interpret the single projected residual geometrically.
+  \item Implement the Householder application of \cref{alg:msckf-update} and compare its cost and result with forming $A_j$ from a full QR.
+  \item Prove that the projected noise vectors $n_{o,j}$ of two different features are independent if their raw noises are,
+        so that stacking them with a block-diagonal (here scalar) noise covariance is correct. Why are the projected
+        \emph{residuals} themselves correlated?
+\end{exercises}

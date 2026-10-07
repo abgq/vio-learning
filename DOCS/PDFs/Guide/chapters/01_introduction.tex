@@ -299,7 +299,9 @@ filter propagates exactly to the image timestamp, appends a clone of the current
 the feature tracks. Tracks that have ended, or whose oldest observation is about to leave the window,
 are triangulated and converted into constraints between clones. The update corrects the IMU state and
 all clones together, the correction is injected into the nominal state, and the oldest clone is
-removed when the window is full.
+removed when the window is full. \Cref{ch:planar} builds a complete miniature of this pipeline for a robot moving in a plane,
+small enough to derive by hand and to run as a short Python script; it is the place to look whenever the general chapters
+feel abstract.
 
 \begin{projectlink}[the road map]
 The project builds this pipeline from the bottom up: the Lie group toolkit (M2), the data

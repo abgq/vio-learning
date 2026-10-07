@@ -81,40 +81,50 @@ test that tells you when you are right.
 % ------------------------------------------------------------------ main matter
 \mainmatter
 
-\part{Mathematical Foundations}
 \include{chapters/01_introduction}
+
+\part{Mathematical Foundations}
 \include{chapters/02_linear_algebra}
-\include{chapters/03_probability}
-\include{chapters/04_rotations}
-\include{chapters/05_lie_theory}
+\include{chapters/03_numerical_linear_algebra}
+\include{chapters/04_calculus_odes}
+\include{chapters/05_probability}
+\include{chapters/06_random_processes}
+\include{chapters/07_rotations}
+\include{chapters/08_lie_theory}
 
 \part{Estimation Theory}
-\include{chapters/06_kalman_filter}
-\include{chapters/07_eskf}
+\include{chapters/09_estimation}
+\include{chapters/10_nonlinear_least_squares}
+\include{chapters/11_linear_systems}
+\include{chapters/12_kalman_filter}
+\include{chapters/13_nonlinear_filtering}
+\include{chapters/14_eskf}
 
 \part{Inertial Navigation}
-\include{chapters/08_imu}
-\include{chapters/09_strapdown}
-\include{chapters/10_error_dynamics}
+\include{chapters/15_imu}
+\include{chapters/16_strapdown}
+\include{chapters/17_error_dynamics}
 
 \part{The Error-State Filter in Practice}
-\include{chapters/11_updates}
-\include{chapters/12_consistency}
+\include{chapters/18_updates}
+\include{chapters/19_consistency}
 
-\part{Geometric Computer Vision}
-\include{chapters/13_camera}
-\include{chapters/14_multiview}
-\include{chapters/15_frontend}
+\part{Computer Vision}
+\include{chapters/20_image_formation}
+\include{chapters/21_image_processing}
+\include{chapters/22_features_tracking}
+\include{chapters/23_multiview}
 
 \part{The Multi-State Constraint Kalman Filter}
-\include{chapters/16_msckf_intro}
-\include{chapters/17_cloning}
-\include{chapters/18_msckf_update}
-\include{chapters/19_full_algorithm}
+\include{chapters/24_ekfslam_msckf}
+\include{chapters/25_cloning}
+\include{chapters/26_msckf_update}
+\include{chapters/27_planar_msckf}
+\include{chapters/28_full_algorithm}
 
 \part{Beyond the Baseline}
-\include{chapters/20_observability}
-\include{chapters/21_engineering}
+\include{chapters/29_observability}
+\include{chapters/30_engineering}
 
 % ------------------------------------------------------------------ appendices
 \appendix
@@ -131,5 +141,6 @@ test that tells you when you are right.
 
 \backmatter
 \include{chapters/references}
+\printindex
 
 \end{document}

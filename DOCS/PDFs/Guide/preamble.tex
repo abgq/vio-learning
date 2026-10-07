@@ -52,7 +52,7 @@
 \usepackage{graphicx}
 \graphicspath{{figures/}}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, calc, decorations.pathreplacing,
+\usetikzlibrary{arrows.meta, positioning, calc, decorations.pathreplacing, decorations.pathmorphing,
                 shapes.geometric, shapes.misc, fit, backgrounds, patterns, 3d,
                 matrix, decorations.markings, shadows}
 \tikzset{
@@ -94,6 +94,17 @@
   columns=fullflexible, keepspaces=true,
   morekeywords={constexpr, noexcept, nodiscard, consteval, concept, requires, nullptr}
 }
+\lstdefinestyle{py}{
+  language=Python,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{primary}\bfseries,
+  commentstyle=\color{proj}\itshape,
+  stringstyle=\color{conv},
+  backgroundcolor=\color{impllight},
+  frame=single, rulecolor=\color{black!15}, framesep=4pt,
+  numbers=none, breaklines=true, showstringspaces=false,
+  columns=fullflexible, keepspaces=true
+}
 \lstset{style=cpp}
 
 % ---------------------------------------------------------------- algorithms
@@ -122,6 +133,9 @@
   {\Huge\bfseries}
 \setcounter{secnumdepth}{2}
 \setcounter{tocdepth}{1}
+\makeatletter % room for two-digit section numbers such as 27.10 in the table of contents
+\renewcommand*\l@section{\@dottedtocline{1}{1.5em}{2.9em}}
+\makeatother
 
 \usepackage{fancyhdr}
 \pagestyle{fancy}
@@ -135,6 +149,15 @@
 \fancyfoot[C]{\small\thepage}
 \renewcommand{\headrulewidth}{0.3pt}
 \fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\thepage}\renewcommand{\headrulewidth}{0pt}}
+
+% --------------------------------------------------------------------- index
+\usepackage[noautomatic]{imakeidx}
+\makeindex[intoc, columns=2, title=Index]
+\indexsetup{othercode=\small}
+% \term{x}: emphasize a term where it is defined and add it to the index.
+% \termi{x}{key}: same, with a different index key (e.g. "Kalman filter!gain").
+\newcommand{\term}[1]{\emph{#1}\index{#1}}
+\newcommand{\termi}[2]{\emph{#1}\index{#2}}
 
 % ---------------------------------------------------------------- hyperlinks
 \usepackage[pdftex, colorlinks=true, linkcolor=primary, citecolor=proj,
@@ -208,6 +231,16 @@
 \newtcolorbox{takeaways}{enhanced, breakable, colback=primarylight!60, colframe=primary,
   boxrule=0.8pt, arc=1.5mm, left=8pt, right=8pt, top=5pt, bottom=5pt,
   fonttitle=\bfseries, title={Key takeaways}, before skip=14pt, after skip=10pt}
+
+\newtcolorbox{aside}[1][]{enhanced, breakable, colback=white, colframe=primary!45,
+  boxrule=0.5pt, arc=1.5mm, left=8pt, right=8pt, top=5pt, bottom=5pt, borderline west={2pt}{0pt}{primary!45},
+  fonttitle=\bfseries\small, coltitle=primary!80!black, colbacktitle=white, attach boxed title to top left={xshift=4mm, yshift=-2mm},
+  boxed title style={colframe=white, colback=white}, title={Going deeper\ifx\relax#1\relax\else: #1\fi},
+  before skip=12pt, after skip=10pt}
+\newtcolorbox{worked}[1][]{enhanced, breakable, colback=projlight!45, colframe=proj!70!black,
+  boxrule=0.6pt, arc=1.5mm, left=8pt, right=8pt, top=5pt, bottom=5pt,
+  fonttitle=\bfseries\small, title={Worked example\ifx\relax#1\relax\else: #1\fi},
+  before skip=10pt, after skip=10pt}
 
 % Derivation exercises for the project Jacobians (AGENTS.md Guardrail 4).
 % Full solutions live in the appendix, which is compiled only when \ifsolutions.

@@ -1,0 +1,221 @@
+\chapter{Linear Dynamical Systems}
+\label{ch:linsys}
+
+\begin{objectives}
+\begin{itemize}
+  \item Write physical systems in continuous- and discrete-time state-space form.
+  \item Discretize deterministic inputs and white process noise exactly and approximately, including Van Loan's method.
+  \item Understand stability, and why inertial errors grow polynomially.
+  \item Define observability, test it with the observability matrix, and compute unobservable directions.
+  \item Understand what observability means for the covariance of a Kalman filter.
+\end{itemize}
+\end{objectives}
+
+The Kalman filter is built on a linear state-space model. This chapter collects the linear systems theory it needs: how to write a model, how
+to turn a continuous-time model into the discrete-time form a computer processes, and how to decide whether the measurements can determine the
+state at all.
+
+% ==============================================================================
+\section{State-space models}
+
+A continuous-time linear \term{state-space model} has the form
+\begin{equation}
+  \dot x(t) = F(t)\,x(t) + B(t)\,u(t) + G(t)\,w(t), \qquad z(t) = H(t)\,x(t) + n(t),
+  \label{eq:ct-model}
+\end{equation}
+with state $x$, known input $u$, white process noise $w$ (density $Q_c$), measurement $z$ and measurement noise $n$. The state is the smallest set of
+numbers whose present value, together with future inputs and noises, determines the future. Its discrete-time counterpart is
+\begin{equation}
+  x_{k+1} = \Phi_k\,x_k + \Gamma_k\,u_k + w_k, \qquad z_k = H_k\,x_k + n_k,
+  \qquad w_k \sim \N(0, Q_k),\ n_k \sim \N(0, R_k).
+  \label{eq:dt-model}
+\end{equation}
+
+\begin{example}[Models used in these notes]
+\label{ex:state-models}
+\begin{itemize}
+  \item \emph{Constant velocity}: $x = (p, v)$, $\dot p = v$, $\dot v = w$ (white acceleration). $F = \begin{bmatrix}0 & 1\\0 & 0\end{bmatrix}$, $G = \begin{bmatrix}0\\1\end{bmatrix}$.
+  \item \emph{Random-walk bias}: $\dot b = w_b$. $F = 0$, $G = 1$.
+  \item \emph{Inertial error model} (one axis, preview of \cref{ch:errordyn}): $\delta\dot p = \delta v$, $\delta\dot v = g\,\delta\theta - \delta b_a - n_a$,
+        $\delta\dot\theta = -\delta b_g - n_g$, plus random-walk biases. A chain of integrators driven by noise.
+\end{itemize}
+\end{example}
+
+The discrete-time solution follows by repeated substitution:
+\begin{equation}
+  x_k = \Phi(k, 0)\,x_0 + \sum_{j=0}^{k-1}\Phi(k, j+1)\big(\Gamma_ju_j + w_j\big), \qquad \Phi(k, j) = \Phi_{k-1}\Phi_{k-2}\cdots\Phi_j,
+\end{equation}
+the discrete analog of the variation-of-constants formula (\cref{prop:stm}).
+
+% ==============================================================================
+\section{Discretization}
+\label{sec:discretization}
+
+Physical laws are continuous, computers are discrete. Over a step $\Dt$ in which $F$, $B$ and $G$ are constant, the solution of \eqref{eq:ct-model}
+(\cref{thm:lti-solution}) is
+\begin{equation}
+  x(t + \Dt) = \underbrace{e^{F\Dt}}_{\Phi}\,x(t) + \int_0^\Dt e^{Fs}B\,u(t + \Dt - s)\,\dd s + \underbrace{\int_0^\Dt e^{Fs}G\,w(t + \Dt - s)\,\dd s}_{w_k},
+\end{equation}
+which has exactly the discrete form \eqref{eq:dt-model}.
+
+\paragraph{Deterministic inputs.} If the input is held constant over the step (a \emph{zero-order hold}, which is what a sampled IMU reading
+means), the input term is $\Gamma u_k$ with $\Gamma = \int_0^\Dt e^{Fs}\,\dd s\,B$. Both $\Phi$ and $\Gamma$ come from one matrix exponential,
+\begin{equation}
+  \exp\!\Big(\begin{bmatrix} F & B \\ 0 & 0\end{bmatrix}\Dt\Big) = \begin{bmatrix} \Phi & \Gamma \\ 0 & I\end{bmatrix},
+\end{equation}
+which can be verified by noting that both sides solve the same matrix ODE in $\Dt$.
+
+\paragraph{Process noise.} The discrete noise $w_k$ is a weighted integral of white noise, so it is zero-mean Gaussian with covariance (by the
+same calculation as in \cref{prop:lyapunov})
+\begin{equation}
+  Q_d = \int_0^\Dt e^{Fs}\,GQ_cG\T\,e^{F\T s}\,\dd s .
+  \label{eq:qd-exact}
+\end{equation}
+
+\subsection{Approximations}
+
+Expanding to first order in $\Dt$ gives the approximations used by most real-time filters and frozen in AGENTS.md F2:
+\begin{equation}
+  \Phi \approx I + F\Dt, \qquad Q_d \approx GQ_cG\T\,\Dt .
+  \label{eq:disc-first-order}
+\end{equation}
+Both are accurate to $O(\Dt^2)$ per step. The units confirm the second: a noise density $\sigma_a$ in $\mathrm{m/s^2/\sqrt{Hz}}$ gives $\sigma_a^2\Dt$ in
+$\mathrm{m^2/s^2}$, a velocity variance. A second-order option adds $\tfrac12F^2\Dt^2$ to $\Phi$ and $\tfrac12(FGQ_cG\T + GQ_cG\T F\T)\Dt^2$ to $Q_d$.
+
+\begin{example}[Double integrator]
+\label{ex:double-integrator-qd}
+For position and velocity driven by white acceleration of density $\sigma$, $F = \begin{bmatrix}0&1\\0&0\end{bmatrix}$, $G = \begin{bmatrix}0\\1\end{bmatrix}$, $Q_c = \sigma^2$.
+\Cref{ex:double-integrator} gives $e^{Fs}G = [s;\ 1]$, so \eqref{eq:qd-exact} evaluates exactly to
+\begin{equation}
+  Q_d = \sigma^2\begin{bmatrix} \Dt^3/3 & \Dt^2/2 \\ \Dt^2/2 & \Dt \end{bmatrix}.
+\end{equation}
+The first-order approximation $Q_d \approx \diag(0, \sigma^2\Dt)$ puts no noise on position within a single step. Yet after $n$ steps of exact $\Phi$, the
+accumulated position variance is $\sum_{k=1}^{n} (k\Dt)^2\sigma^2\Dt \to \sigma^2 t^3/3$ as $\Dt\to0$ (a Riemann sum), which is the exact answer of
+\cref{prop:integrated-noise}. The per-step error of the approximation does not accumulate into a wrong growth law; it only introduces an $O(\Dt)$
+relative error, negligible at 200~Hz.
+\end{example}
+
+\subsection{Van Loan's method}
+
+When higher accuracy is wanted, \eqref{eq:qd-exact} can be computed exactly with a single matrix exponential~\cite{vanloan1978}.
+
+\begin{proposition}[Van Loan]
+\label{prop:vanloan}
+\index{Van Loan's method}
+Let $C = \exp\!\Big(\begin{bmatrix} -F & GQ_cG\T \\ 0 & F\T \end{bmatrix}\Dt\Big) = \begin{bmatrix} C_{11} & C_{12} \\ 0 & C_{22}\end{bmatrix}$. Then
+$\Phi = C_{22}\T$ and $Q_d = \Phi\, C_{12}$.
+\end{proposition}
+\begin{proof}
+For a block upper-triangular generator, the diagonal blocks of the exponential are the exponentials of the diagonal blocks, so $C_{22} = e^{F\T\Dt}$.
+The off-diagonal block, as a function of $\Dt$, satisfies $\dot C_{12} = -FC_{12} + GQ_cG\T C_{22}$ with $C_{12}(0) = 0$, whose solution (variation of constants)
+is $C_{12} = \int_0^\Dt e^{-F(\Dt - s)}\,GQ_cG\T\,e^{F\T s}\,\dd s$. Multiplying by $\Phi = e^{F\Dt}$ on the left, and using
+$e^{F\Dt}e^{-F(\Dt - s)} = e^{Fs}$, gives $\Phi C_{12} = \int_0^\Dt e^{Fs}\,GQ_cG\T\,e^{F\T s}\,\dd s$, which is \eqref{eq:qd-exact}.
+\end{proof}
+
+For the 15-state inertial error model this costs a $30\times30$ matrix exponential per step, too expensive at 200~Hz but an excellent test oracle for the
+closed forms of \cref{ch:errordyn}.
+
+% ==============================================================================
+\section{Stability}
+
+A linear time-invariant system is \emph{stable} if its free response decays. For $\dot x = Fx$ the modes are $e^{\lambda_it}$ (\cref{thm:lti-solution}), so the
+system is asymptotically stable when all eigenvalues of $F$ have negative real parts. For $x_{k+1} = \Phi x_k$ the modes are $\lambda_i^k$, so all eigenvalues of
+$\Phi$ must lie strictly inside the unit circle; the two conditions correspond through $\lambda_\Phi = e^{\lambda_F\Dt}$.
+
+Integrators have eigenvalues at zero (continuous) or one (discrete): they are \emph{marginally} stable. A single integrator holds its state; a chain of
+integrators (a nilpotent $F$) makes initial errors grow \emph{polynomially}, like $t$, $t^2$, $t^3$. The error dynamics of inertial navigation are of this
+kind (\cref{ex:state-models}), which is why IMU errors grow polynomially rather than exponentially, and why they never stop growing without aiding.
+
+% ==============================================================================
+\section{Observability}
+\label{sec:observability-linear}
+
+\subsection{Definition and the observability matrix}
+
+\begin{definition}[Observability]
+\index{observability}
+A system is \term{observable} if the initial state $x_0$ can be determined from the inputs and the noise-free outputs over a finite time.
+\end{definition}
+
+Because the inputs are known, their contribution to the outputs can be subtracted, so observability depends only on $(\Phi, H)$. For a discrete
+time-invariant system without noise, $z_k = H\Phi^kx_0$. Stacking the first $n$ outputs,
+\begin{equation}
+  \begin{bmatrix} z_0 \\ z_1 \\ \vdots \\ z_{n-1}\end{bmatrix} = \underbrace{\begin{bmatrix} H \\ H\Phi \\ \vdots \\ H\Phi^{n-1}\end{bmatrix}}_{\mathcal O}x_0 .
+\end{equation}
+
+\begin{theorem}[Observability rank test]
+\label{thm:obs-rank}
+\index{observability matrix}
+The system is observable if and only if the \term{observability matrix} $\mathcal O$ has rank $n$. Its nullspace is the \term{unobservable subspace}: the
+initial states that produce identically zero output forever.
+\end{theorem}
+\begin{proof}
+If $\mathcal O$ has full column rank, $x_0$ is the unique solution of the stacked equations. If $\mathcal Ox_0 = 0$ for some $x_0 \ne 0$, then $H\Phi^kx_0 = 0$ for
+$k < n$, and by the Cayley--Hamilton theorem ($\Phi^n$ is a linear combination of $I, \Phi, \dots, \Phi^{n-1}$) also for all $k \ge n$; such an $x_0$ is
+indistinguishable from zero. More outputs never add rank beyond the first $n$.
+\end{proof}
+
+The unobservable subspace is invariant under $\Phi$: an unobservable error stays unobservable as the system evolves. For time-varying systems, the
+same reasoning gives $\mathcal O = [H_0;\ H_1\Phi(1, 0);\ H_2\Phi(2, 0);\ \dots]$, and observability can depend on the trajectory, a fact that matters
+greatly for VIO (\cref{ch:observability}).
+
+\subsection{Examples}
+
+\begin{example}[Position versus velocity measurements]
+For the discretized constant-velocity model, $\Phi = \begin{bmatrix}1 & \Dt\\0 & 1\end{bmatrix}$.
+\begin{itemize}
+  \item Measuring position, $H = [1\ \ 0]$: $\mathcal O = \begin{bmatrix}1 & 0\\1 & \Dt\end{bmatrix}$ has rank 2. Velocity is observable, through the change of position.
+  \item Measuring velocity, $H = [0\ \ 1]$: $\mathcal O = \begin{bmatrix}0 & 1\\0 & 1\end{bmatrix}$ has rank 1, with nullspace $(1, 0)$. Position is unobservable: shifting the whole
+        trajectory changes no measurement. This is dead reckoning in one line.
+\end{itemize}
+\end{example}
+
+\begin{example}[A bias that looks like the state]
+Let $x = (p, b)$ with $\dot p = 0$, $\dot b = 0$ and $z = p + b$. Then $H = [1\ \ 1]$, $\Phi = I$, and $\mathcal O = \begin{bmatrix}1 & 1\\1 & 1\end{bmatrix}$ has nullspace $(1, -1)$: a
+change of position compensated by an opposite change of bias is invisible. A sensor bias can be estimated only if something else breaks this
+symmetry. In inertial navigation that something is motion: an accelerometer bias becomes separable from tilt once the vehicle rotates
+(\cref{ch:strapdown}).
+\end{example}
+
+\begin{example}[An IMU along a line]
+Let $x = (p, v, b_a)$ with $\dot p = v$, $\dot v = a_m - b_a$ ($a_m$ known) and $\dot b_a = 0$, and measure $p$. In continuous time,
+$F = \begin{bmatrix}0&1&0\\0&0&-1\\0&0&0\end{bmatrix}$ and $H = [1\ 0\ 0]$, and the continuous-time observability matrix $[H;\ HF;\ HF^2]$ is
+$\begin{bmatrix}1&0&0\\0&1&0\\0&0&-1\end{bmatrix}$, of full rank. Position measurements reveal velocity (one differentiation) and the accelerometer bias (two
+differentiations): the reason a pose sensor makes all IMU states observable in Milestone 6.
+\end{example}
+
+\subsection{Duality and controllability}
+
+The dual notion, \emph{controllability}, asks whether the inputs (or noises) can drive the state anywhere; its test matrix is
+$[\Gamma,\ \Phi\Gamma,\ \dots,\ \Phi^{n-1}\Gamma]$, and $(\Phi, \Gamma)$ is controllable exactly when $(\Phi\T, \Gamma\T)$ is observable. For a Kalman filter,
+controllability by the process noise means that every state is continually excited by noise, which keeps the filter from becoming certain
+of anything and ignoring new data.
+
+\subsection{What observability means for a filter}
+
+For a time-invariant system that is observable from its measurements and controllable from its process noise, the Kalman filter covariance
+converges to a unique, bounded steady state, whatever the initial covariance (\cref{ch:kf}). Along unobservable directions there is no such
+bound: the covariance there can only grow with process noise or stay at its prior value, because no measurement reduces it. A filter must
+respect this. If its linearized model makes an unobservable direction appear observable, it will \emph{reduce} the covariance along that direction
+without justification, and become overconfident. This is precisely what happens to the standard EKF in VIO (\cref{ch:observability}).
+
+\begin{takeaways}
+\begin{itemize}
+  \item State-space models collect everything needed to predict the future; discrete models follow from continuous ones by integrating over
+        a step.
+  \item $\Phi = e^{F\Dt}$, $Q_d = \int e^{Fs}GQ_cG\T e^{F\T s}\dd s$; to first order $\Phi \approx I + F\Dt$ and $Q_d \approx GQ_cG\T\Dt$. Van Loan computes both exactly.
+  \item Chains of integrators are marginally stable: their errors grow polynomially.
+  \item Observability: $\mathcal O = [H;\ H\Phi;\ \dots]$ must have full rank; its nullspace contains the directions the outputs cannot see.
+  \item A filter may reduce uncertainty only in observable directions.
+\end{itemize}
+\end{takeaways}
+
+\begin{exercises}
+  \item Write the mass-spring-damper $m\ddot y + c\dot y + ky = u$ in state-space form and find its eigenvalues. When is it stable?
+  \item Compute $\Gamma$ for the double integrator with a zero-order-hold acceleration input, and interpret its entries.
+  \item Verify \cref{prop:vanloan} numerically for the double integrator.
+  \item Find the unobservable subspace of the constant-velocity model with measurements of $p_1 - p_2$ for two independent targets.
+  \item Show that the continuous-time system $\dot x = Fx$, $z = Hx$ is observable if and only if $[H;\ HF;\ \dots;\ HF^{n-1}]$ has full rank.
+  \item A gyroscope measures $\omega + b_g$, and an inclinometer measures the integrated angle. Is the gyro bias observable? What if the inclinometer
+        is replaced by a second gyroscope?
+\end{exercises}

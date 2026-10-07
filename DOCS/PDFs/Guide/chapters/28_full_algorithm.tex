@@ -1,0 +1,200 @@
+\chapter{The Complete Algorithm}
+\label{ch:fullalgo}
+
+\begin{objectives}
+\begin{itemize}
+  \item Assemble every component into one event-driven estimator, with the correct order of operations.
+  \item Estimate the computational budget and map the algorithm onto the project's software architecture.
+  \item Diagnose the most common failures from their symptoms.
+\end{itemize}
+\end{objectives}
+
+% ------------------------------------------------------------------------------
+\section{The event loop}
+
+The estimator consumes a single, time-ordered stream of sensor events. Milestone 3 builds it by merging the presorted IMU,
+image (and, for testing, pose) arrays with a two-pointer merge, with the rule that an IMU sample precedes any other event
+with the same timestamp. \Cref{alg:msckf} shows the loop.
+
+\begin{algorithm}[t]
+\caption{Monocular MSCKF}
+\label{alg:msckf}
+\begin{algorithmic}[1]
+\Require event stream, calibration, noise parameters
+\LineComment{load phase: allocation allowed}
+\State parse data and calibration; build the event arrays; construct the filter and front end with fixed-max workspaces
+\State initialize $(\hat x, P)$ (ground truth in the project, logged; static initialization otherwise)
+\LineComment{streaming phase: no allocation in the core}
+\For{each event $e$ in timestamp order}
+  \If{$e$ is an IMU sample at $t$}
+    \State propagate nominal state and covariance from $t_{prev}$ to $t$ \Comment{\cref{ch:strapdown,ch:errordyn}}
+  \ElsIf{$e$ is an image at $t_c$}
+    \State propagate to $t_c$ (interpolated IMU) \Comment{exact image time}
+    \State front end: track, verify, undistort; update track histories \Comment{\cref{ch:frontend}}
+    \State process tracks that were lost in this image \Comment{\cref{alg:msckf-update}}
+    \If{$N = $ \code{kMaxClones}}
+      \State process tracks with an observation at the oldest clone
+      \State marginalize the oldest clone in place \Comment{\cref{ch:cloning}}
+    \EndIf
+    \State clone $(\hat p, \hat q)$; $P \gets JPJ\T$; attach this image's observations to the new clone
+  \EndIf
+  \State log state, $\diag(P)$, NIS and gate statistics to the preallocated buffer
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+Three ordering rules are essential.
+\begin{enumerate}
+  \item \textbf{Propagate before you update.} A measurement at time $t$ must be applied to the state at time $t$, never to the
+        state at the previous IMU sample.
+  \item \textbf{Use a clone's observations before you delete it.} Every feature with an observation at the oldest clone is
+        processed before that clone is marginalized; otherwise its information is lost.
+  \item \textbf{Use each observation once.} After a track has been used, its observations are discarded. If the feature keeps
+        being tracked, later observations form a new track.
+\end{enumerate}
+With the order of \cref{alg:msckf}, the window never holds more than \code{kMaxClones} clones, which keeps the covariance within its
+fixed maximum size. A feature processed because its oldest clone is leaving cannot use the current image's observation in that
+update, because the new clone does not exist yet. Implementations that clone first need room for one extra clone. Either
+choice is valid; the storage bound must match it.
+The planar filter of \cref{ch:planar} runs exactly this loop (\cref{alg:planar-msckf}) in a few lines of Python, which makes it a
+convenient place to experiment with the ordering rules before committing to them in C++.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[xscale=0.9, yscale=1.0]
+  \draw[->, thick] (0,0) -- (15.5,0) node[right, font=\footnotesize] {$t$};
+  \foreach \x in {0,0.25,...,15.0} \draw[black!45] (\x,-0.08) -- (\x,0.08);
+  \node[font=\scriptsize, black!60, below] at (0.6,-0.15) {IMU, 200 Hz};
+  \foreach \k/\x in {1/1.25, 2/3.75, 3/6.25, 4/8.75, 5/11.25, 6/13.75} {
+    \draw[primary, thick] (\x,-0.25) -- (\x,0.6);
+    \draw[fill=primarylight, draw=primary] (\x-0.25,0.6) rectangle (\x+0.25,1.0);
+    \node[font=\scriptsize] at (\x,0.8) {$C_\k$};
+  }
+  \node[font=\scriptsize, primary, below] at (3.75,-0.25) {image (20 Hz)};
+  % features
+  \draw[plotgreen, very thick] (1.25,1.35) -- (8.75,1.35) node[right, font=\scriptsize] {track $f_1$ lost $\Rightarrow$ update};
+  \fill[plotgreen] (1.25,1.35) circle (2pt) (3.75,1.35) circle (2pt) (6.25,1.35) circle (2pt) (8.75,1.35) circle (2pt);
+  \draw[plotorange, very thick] (3.75,1.85) -- (13.75,1.85);
+  \fill[plotorange] (3.75,1.85) circle (2pt) (6.25,1.85) circle (2pt) (8.75,1.85) circle (2pt) (11.25,1.85) circle (2pt) (13.75,1.85) circle (2pt);
+  \node[font=\scriptsize, plotorange, align=left, right] at (13.85,1.95) {$f_2$: oldest clone\\leaving $\Rightarrow$ update};
+  \draw[decorate, decoration={brace, amplitude=4pt}] (3.5,2.25) -- (14.0,2.25) node[midway, above=5pt, font=\scriptsize] {window (example \code{kMaxClones} = 5)};
+  \draw[conv, ->] (1.25,2.5) -- (1.25,1.1) node[pos=0, above, font=\scriptsize, align=center] {$C_1$ marginalized\\when $C_6$ arrives};
+\end{tikzpicture}
+\caption{Timeline of the MSCKF. The IMU propagates at 200~Hz; each image creates a clone; feature tracks are processed when
+they end or when the clone holding their oldest observation is about to leave the window.}
+\label{fig:timeline}
+\end{figure}
+
+% ------------------------------------------------------------------------------
+\section{Initialization and the first seconds}
+
+The project initializes from ground truth, which removes the hardest failure mode from early testing and is logged as a use of
+ground truth (Milestone 10b). With static initialization (\cref{ch:strapdown}), the first seconds are delicate: the yaw is
+arbitrary, the accelerometer bias is entangled with tilt, and the window contains few clones with little parallax. Generous
+initial covariances, and a check that enough features with sufficient parallax exist before trusting visual updates, avoid
+early divergence. Inspect the IMU data of each EuRoC sequence before running on it: a static start followed by vigorous
+motion is the easiest case for initialization, and a fast start the hardest.
+
+% ------------------------------------------------------------------------------
+\section{Computational budget}
+
+With $N = 10$ clones the error state has $n = 75$ dimensions. Rough flop counts per operation:
+\begin{center}\small
+\begin{tabular}{@{}l l r@{}}
+\toprule
+Operation & Frequency & Cost (flops) \\
+\midrule
+Nominal propagation & 200 Hz & $\sim10^2$ \\
+$P_{II}$, $P_{IC}$ propagation & 200 Hz & $\sim2\times10^4$ \\
+Cloning ($P \gets JPJ\T$ as block copies) & 20 Hz & $\sim10^4$ \\
+Per feature: triangulation, projection, gating ($M = 6$) & per track & $\sim10^5$ \\
+QR compression of $d = 450$ rows & per update & $\sim5\times10^6$ \\
+Update ($S$, gain, Joseph) with $n = 75$ & per update & $\sim3\times10^6$ \\
+Front end (KLT on 150 features) & 20 Hz & dominant in time \\
+\bottomrule
+\end{tabular}
+\end{center}
+The filter core needs on the order of $10^7$ flops per image, a few milliseconds on an embedded processor and well under a
+millisecond on a desktop. The front end is usually the bottleneck in wall-clock time. The cubic growth with $n$ is why the window
+is short and why QR compression matters for large stacks.
+
+% ------------------------------------------------------------------------------
+\section{Software architecture}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[node distance=8mm and 10mm]
+  \node[block, minimum width=48mm, align=left] (core) {\textbf{vio\_core} (static, Eigen only)\\ \footnotesize so3, imu\_integrator, es\_ekf,\\ \footnotesize camera\_model, triangulation, msckf\_update};
+  \node[block, minimum width=34mm, above left=10mm and -14mm of core, align=left] (io) {\textbf{vio\_io}\\ \footnotesize dataset\_loader, telemetry\\ \footnotesize + YAML parser};
+  \node[block, minimum width=34mm, above right=10mm and -14mm of core, align=left] (fe) {\textbf{vio\_frontend}\\ \footnotesize visual\_frontend\\ \footnotesize + OpenCV};
+  \node[block, minimum width=30mm, above=24mm of core, fill=white] (app) {\textbf{vio\_app}\\ \footnotesize main.cpp};
+  \draw[->, thick] (io) -- (core); \draw[->, thick] (fe) -- (core);
+  \draw[->, thick] (app) -- (io); \draw[->, thick] (app) -- (fe); \draw[->, thick] (app) -- (core);
+  \node[font=\footnotesize, align=center, below=2mm of core] {arrows: ``depends on''. OpenCV never reaches \code{vio\_core};\\ each test links only the library it tests.};
+\end{tikzpicture}
+\caption{Library targets of the project (AGENTS.md). Dependencies point one way, so the estimator core can be built, tested and
+reasoned about without the I/O and vision libraries.}
+\label{fig:architecture}
+\end{figure}
+
+\Cref{fig:architecture} shows how the algorithm maps to the project's targets. The zero-allocation discipline applies to
+\code{vio\_core}, which contains everything executed per IMU sample and per update. The front end may allocate but must reuse its
+buffers, and the I/O layer allocates freely during loading.
+
+% ------------------------------------------------------------------------------
+\section{Debugging guide}
+
+\begin{table}[t]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{4.4cm} X@{}}
+\toprule
+\textbf{Symptom} & \textbf{Likely causes} \\
+\midrule
+Altitude diverges at about $2g$ in IMU-only propagation & gravity or specific-force sign; $g_w$ added twice \\
+Position diverges within seconds even with ground-truth init & $R_{wb}$ used as $R_{bw}$; quaternion $w/z$ swapped at load; gyro and accel columns or biases swapped; degrees vs radians \\
+Rotation matrices slowly scale vectors & missing quaternion normalization \\
+NaN after a while & missing Taylor branch; $\Log$ near $\pi$; $\Jrinv$ evaluated beyond $\pi$; feature at zero depth; Cholesky of a non-PD $S$ \\
+Corrections systematically make things worse & sign of $H$ or of the residual; injection on the wrong side of the quaternion; global vs local convention mixed \\
+Covariance loses symmetry or positive definiteness & simple update form instead of Joseph; missing symmetrization; aliasing in Eigen block products \\
+Nearly all features fail the gate & overconfident $P$; $T_{bc}$ inverted; pixel noise used in normalized units (or vice versa); distortion not removed; timestamps misaligned \\
+Gate rejects nothing & $R_z$ or $\sigma_{uv}$ far too large; gate threshold indexed with the wrong dimension \\
+Slowly growing yaw error with healthy NIS & expected EKF inconsistency along unobservable yaw (\cref{ch:observability}) \\
+Scale drift & little acceleration (degenerate motion); accelerometer noise or bias badly tuned \\
+Works on synthetic data, fails on EuRoC & extrinsics, time offset, distortion, noise inflation, initialization, IMU gaps \\
+Results differ between runs & uninitialized memory (run the sanitizers); unseeded random generators \\
+\bottomrule
+\end{tabularx}
+\caption{Symptoms and their most frequent causes.}
+\label{tab:debugging}
+\end{table}
+
+\Cref{tab:debugging} collects the failures that experience shows are most common. The milestone structure of the project is itself
+the most effective debugging tool: each layer is verified against known truth before the next is built on top of it, so a new
+failure is almost always in the newest layer.
+
+\section{What to expect on EuRoC}
+
+Published monocular filter-based estimators reach absolute trajectory errors of the order of 0.1 to 0.5~m on the machine-hall
+sequences, depending on features, tuning and initialization, with the difficult sequences (fast motion, motion blur, dark
+regions) considerably worse~\cite{delmerico2018benchmark}. Milestone 10b sets a first-pass target of 0.5~m on MH\_01 and a stretch target of
+0.2~m. Yaw and position drift without bound; roll and pitch remain accurate throughout; velocity and biases converge within the
+first seconds of excitation.
+
+\begin{takeaways}
+\begin{itemize}
+  \item One time-ordered stream; propagate to each event's time before applying it.
+  \item At each image: process lost tracks; if the window is full, process the oldest clone's tracks and marginalize it; then clone.
+  \item The core costs about $10^7$ flops per image; the front end usually dominates the run time.
+  \item Dependencies point one way: \code{vio\_core} knows nothing about files, YAML or OpenCV.
+  \item Most failures map to a small set of sign, frame, unit and timing errors; test each layer against truth.
+\end{itemize}
+\end{takeaways}
+
+\begin{exercises}
+  \item Write the event-loop pseudocode for the alternative ordering (clone first, then process and marginalize). What capacity
+        does it require, and what does it gain?
+  \item Instrument a run to record the number of features processed per update, their observation counts, and the stacked row
+        count $d$. Choose the compile-time row cap from the distribution.
+  \item For each row of \cref{tab:debugging}, design a unit or integration test that would have caught the cause before the full
+        system was assembled.
+\end{exercises}

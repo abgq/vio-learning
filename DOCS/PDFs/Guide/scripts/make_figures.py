@@ -645,3 +645,7 @@ if __name__ == "__main__":
     fig_distortion()
     fig_triangulation()
     fig_structure_tensor()
+
+    import figures_extra  # foundations, filtering examples and vision figures
+
+    figures_extra.main()

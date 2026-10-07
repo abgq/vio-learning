@@ -12,3 +12,6 @@ __pycache__/
 *.fls
 *.fdb_latexmk
 *.synctex.gz
+*.idx
+*.ind
+*.ilg

@@ -22,6 +22,8 @@ if (-not $SkipFigures) {
     if ($LASTEXITCODE -ne 0) { throw 'make_figures.py failed' }
     & $py scripts\make_tables.py
     if ($LASTEXITCODE -ne 0) { throw 'make_tables.py failed' }
+    & $py scripts\planar_sims.py      # planar MSCKF and FEJ Monte Carlo (a few minutes)
+    if ($LASTEXITCODE -ne 0) { throw 'planar_sims.py failed' }
 }
 
 function Invoke-LaTeX([string]$JobName, [string]$Source) {
@@ -30,6 +32,10 @@ function Invoke-LaTeX([string]$JobName, [string]$Source) {
         if ($LASTEXITCODE -ne 0) {
             Select-String -Path "$JobName.log" -Pattern '^!' -Context 0, 6 | Select-Object -First 3
             throw "pdflatex failed for $JobName (pass $pass); see $JobName.log"
+        }
+        if ($pass -eq 1) {
+            makeindex -q "$JobName.idx" | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "makeindex failed for $JobName" }
         }
     }
     $pages = (Select-String -Path "$JobName.log" -Pattern 'Output written on .*\((\d+) pages').Matches.Groups[1].Value

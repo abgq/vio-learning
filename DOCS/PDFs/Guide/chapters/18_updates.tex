@@ -1,0 +1,227 @@
+\chapter{Measurement Updates, Gating and the Pose Sensor}
+\label{ch:updates}
+\chaptermark{Measurement Updates} % short running header
+
+\begin{objectives}
+\begin{itemize}
+  \item Apply the generic manifold update to concrete sensors, deriving $H$ by the elementary Jacobians.
+  \item Understand which state directions a measurement observes, from the nullspace of $H$.
+  \item Implement the mock pose sensor of Milestone 6 and derive its Jacobian.
+  \item Gate measurements with the $\chi^2$ test, and understand how gating fails in an overconfident filter.
+  \item Understand how a pose sensor makes velocity and biases observable.
+\end{itemize}
+\end{objectives}
+
+% ------------------------------------------------------------------------------
+\section{The generic update}
+
+\begin{convention}[measurement update, AGENTS.md F3]
+\begin{enumerate}
+  \item Residual $r = z\bminus h(\hat x)$: plain subtraction for vector measurements; for the pose measurement
+        $r = [\,p_{meas} - \hat p;\ \Log_q(\hat q\inv\qprod q_{meas})\,]$.
+  \item $H = \partial r/\partial\delta x$ at $\delta x = 0$ using C4 (\cref{sec:manifold-update}), derived by hand and verified by
+        finite differences.
+  \item $S = HPH\T + R_z$; $K = PH\T S\inv$ by a Cholesky/LDL$^\mathsf{T}$ solve, never an explicit inverse.
+  \item Mahalanobis gate $r\T S\inv r < \chi^2_{0.95}(\dim r)$ from a \code{constexpr} table. Rejections are counted and
+        logged, never silently dropped.
+  \item Joseph form $P \gets (I - KH)P(I - KH)\T + KR_zK\T$, then injection and reset (\cref{sec:reset}).
+\end{enumerate}
+\end{convention}
+
+Everything specific to a sensor is in $h$ and $H$. The rest of this section derives them for two sensors that the
+project does not use, to demonstrate the technique, before turning to the pose sensor it does use.
+
+% ------------------------------------------------------------------------------
+\section{Worked example: position with a lever arm}
+
+A GNSS antenna mounted at a known offset $\ell_b$ from the IMU, expressed in the body frame, measures the
+antenna position:
+\begin{equation}
+  z = h(x) + n = p_{wb} + R_{wb}\,\ell_b + n, \qquad n \sim \N(0, \sigma^2I_3).
+\end{equation}
+The residual is a plain difference, $r = z - (\hat p + \hat R\ell_b)$. To find $H$, perturb the nominal state with
+$\bplus$ and expand:
+\begin{equation*}
+  h(\hat x\bplus\delta x) = \hat p + \delta p + \hat R\Exp(\delta\theta)\ell_b
+  \approx \hat p + \delta p + \hat R\ell_b + \hat R\sx{\delta\theta}\ell_b
+  = h(\hat x) + \delta p - \hat R\sx{\ell_b}\delta\theta .
+\end{equation*}
+Reading off the coefficients (the rotation-action row of \cref{tab:jacobians}),
+\begin{equation}
+  H = \begin{bmatrix} I_3 & 0_3 & -\hat R\sx{\ell_b} & 0_3 & 0_3 \end{bmatrix}.
+\end{equation}
+The attitude column is non-zero because the antenna swings around the IMU when the body rotates. A
+lever-arm position measurement therefore carries attitude information, but only about rotations that move
+the antenna: the nullspace of $-\hat R\sx{\ell_b}$ is the direction $\ell_b$, since rotating about the lever arm itself
+does not move the antenna.
+
+% ------------------------------------------------------------------------------
+\section{Worked example: a direction sensor}
+
+A magnetometer, or an accelerometer used as an inclinometer at rest, measures a known world vector $m_w$ in
+body coordinates:
+\begin{equation}
+  z = R_{wb}\T m_w + n .
+\end{equation}
+With the inverse-action row of \cref{tab:jacobians}, $h(\hat x\bplus\delta x) = \Exp(-\delta\theta)\hat R\T m_w \approx \hat R\T m_w +
+\sx{\hat R\T m_w}\delta\theta$, so
+\begin{equation}
+  H = \begin{bmatrix} 0_3 & 0_3 & \sx{\hat R\T m_w} & 0_3 & 0_3 \end{bmatrix}.
+\end{equation}
+$\sx{v}$ has rank two and nullspace $\mathrm{span}(v)$, so a direction measurement observes two of the three attitude
+degrees of freedom. The rotation about the measured direction is unobservable. For gravity this is the
+familiar statement that an accelerometer at rest gives roll and pitch but not yaw.
+
+\begin{keyidea}[the nullspace of $H$ tells you what a sensor cannot see]
+Any error direction $\delta x \in \nullsp(H)$ produces no change in the predicted measurement, so the update cannot
+correct it. Reading the nullspace of each new $H$ is a quick sanity check of both the derivation and your
+intuition about the sensor.
+\end{keyidea}
+
+% ------------------------------------------------------------------------------
+\section{The pose sensor of Milestone 6}
+
+Before introducing a camera, the project tests the whole ESKF with a ``mock sensor'' that measures the pose
+directly. Ground-truth poses, decimated to about 10~Hz, are corrupted with synthetic noise of known statistics.
+
+\begin{convention}[pose measurement, AGENTS.md C6]
+\begin{equation}
+  p_{meas} = p_{wb} + n_p, \qquad q_{meas} = q_{wb}\qprod\Exp_q(n_\theta), \qquad
+  R_z = \diag(\sigma_p^2 I_3,\ \sigma_\theta^2 I_3).
+\end{equation}
+\end{convention}
+
+The attitude noise is applied on the right, in the body frame, which is exactly the local perturbation. That
+choice makes the residual \eqref{eq:manifold-residual} statistically clean: if the nominal state were exact, the
+attitude residual would be exactly $n_\theta$. To generate the noise, draw $n_p$ and $n_\theta$ from seeded
+\code{std::mt19937\_64} generators (AGENTS.md E5) with the same $\sigma_p$, $\sigma_\theta$ that appear in $R_z$.
+
+\begin{derivex}{the pose measurement Jacobian $H \in \R^{6\times15}$}{sol:Hpose}
+Using \eqref{eq:manifold-H}, derive $H$ for $h(x) = (p_{wb}, q_{wb})$ with the residual of AGENTS.md F3.
+\begin{enumerate}
+  \item The position rows are a plain difference. Which state blocks does $\hat p + \delta p$ depend on?
+  \item For the attitude rows, evaluate $\Log_q\big(\hat q\inv\qprod(\hat q\qprod\Exp_q(\delta\theta))\big)$ and simplify.
+        Which elementary Jacobian applies if you instead linearize around a non-zero residual?
+  \item Write $H$ in the frozen column order and state its nullspace. Which states are \emph{not} directly measured,
+        and how can they still be corrected?
+\end{enumerate}
+\textbf{Check:} the finite-difference test of $r(\delta x) = h(\hat x\bplus\delta x)\bminus h(\hat x)$ at a non-trivial state, as
+required by Milestone 6.
+\end{derivex}
+
+\paragraph{How unmeasured states get corrected.} The pose sensor measures neither velocity nor biases, yet the
+update corrects both. The mechanism is the cross-covariance built up by propagation. Between updates, a velocity
+error produces a growing position error, so $P_{pv}$ becomes large; an accelerometer bias produces a velocity error
+and then a position error, so $P_{p b_a}$ grows; a gyro bias produces an attitude error, so $P_{\theta b_g}$ grows. The gain
+$K = PH\T S\inv$ has non-zero rows for every state correlated with the measured ones, so each pose update corrects
+them in proportion to those correlations.
+
+\paragraph{Why the biases converge.} Observability here has an intuitive reading. The gyro bias is the slope of the
+difference between the integrated gyro and the measured attitude, which a sequence of attitude measurements reveals.
+The velocity is the slope of the measured position. The accelerometer bias is the difference between the
+acceleration implied by successive velocities and the specific force rotated with the (measured) attitude, so it
+too becomes observable. Even at rest it is separable from tilt, because the attitude is measured directly. With
+pose measurements every state of the IMU error state is observable, and their covariances converge.
+
+% ------------------------------------------------------------------------------
+\section{Gating}
+\label{sec:gating}
+
+Real measurements include outliers: a misassociated feature, a reflection, a moving object. A single outlier with a
+large residual can drag the estimate far away and corrupt the covariance. The $\chi^2$ test of \cref{prop:innovation}
+rejects measurements that are statistically implausible given the filter's own uncertainty:
+\begin{equation}
+  \gamma = r\T S\inv r \ \stackrel{?}{<}\ \chi^2_{1-\alpha}(\dim r).
+\end{equation}
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}c c c c c c c@{}}
+\toprule
+$\dim r$ & 1 & 2 & 3 & 4 & 5 & 6 \\
+\midrule
+$\chi^2_{0.95}$ & 3.841 & 5.991 & 7.815 & 9.488 & 11.070 & 12.592 \\
+$\chi^2_{0.99}$ & 6.635 & 9.210 & 11.345 & 13.277 & 15.086 & 16.812 \\
+\bottomrule
+\end{tabular}
+\caption{Gate thresholds. A longer table, up to 600 degrees of freedom, is in \cref{app:tables}.}
+\label{tab:chi2-short}
+\end{table}
+
+With a 95\% gate, a consistent filter rejects 5\% of perfectly good measurements. That is the price of rejecting
+most outliers, and it is why rejections are counted and logged: a rejection rate close to 5\% is a sign of
+health, a rate near zero suggests an underconfident filter (or a gate that is too loose to be useful), and a
+rate far above 5\% indicates overconfidence or a model error.
+
+\begin{pitfall}[the death spiral]
+Gating assumes the filter is consistent. If $P$ is too small, good measurements produce large $\gamma$ and are
+rejected; with no corrections $P$ should grow, but if the model's process noise is also too small it grows slowly
+while the true error grows quickly, and more measurements are rejected. The filter then dead-reckons with false
+confidence until it diverges. When the rejection rate jumps, suspect overconfidence before suspecting outliers.
+\end{pitfall}
+
+The threshold depends on the dimension of $r$. A pose measurement uses $\chi^2_{0.95}(6)$, a single image
+observation $\chi^2_{0.95}(2)$, and a projected MSCKF feature residual $\chi^2_{0.95}(2M-3)$, where $M$ is the number of
+observations (\cref{ch:msckfupdate}). Because the quantiles grow with the dimension, the table is generated offline
+and stored as a \code{constexpr} array, which avoids depending on a statistics library in the core.
+
+% ------------------------------------------------------------------------------
+\section{Pseudo-measurements and timing}
+
+\paragraph{Pseudo-measurements.} Knowledge that is not a sensor reading can be fed to the filter as if it were one. The most useful is the \term{zero-velocity
+update} (ZUPT): when the vehicle is known to be at rest (detected, for example, from a very small variance of the accelerometer and gyroscope readings over
+a window), apply the measurement $z = 0 = v_{wb} + n$ with $H = [0\ \ I_3\ \ 0\ \ 0\ \ 0]$ and a small noise covariance. It stops velocity drift, and through the
+correlations it also refines tilt and biases. A ZUPT applied when the vehicle is in fact moving is a large, confident, wrong measurement; the detection must
+be conservative. Similar pseudo-measurements express a known constant altitude, a non-holonomic constraint (a car does not slide sideways), or a
+known landmark.
+
+\paragraph{Measurement timing.} A measurement taken at time $t_z$ must be applied to the state at $t_z$, after propagating exactly to that time
+(\cref{ch:strapdown}). Measurements that arrive \emph{late}, after the filter has already propagated past their timestamp, are a problem for every filter:
+either the filter buffers the IMU data and re-propagates from $t_z$, or it uses a stochastic clone of the state at $t_z$ (\cref{ch:cloning}), which is exactly the
+MSCKF's approach for camera measurements. On EuRoC, data are processed offline in timestamp order, so late measurements do not occur.
+
+% ------------------------------------------------------------------------------
+\section{Testing the update}
+
+\begin{projectlink}[Milestone 6]
+The exit criteria test properties that hold for any correct implementation:
+\begin{itemize}
+  \item $H$ passes the finite-difference test at a non-trivial state;
+  \item $P_{prior} - P_{post}$ is positive semi-definite (an update never adds uncertainty);
+  \item after injection and reset all quaternions are unit, and a second update with the same $z$ produces a residual
+        consistent with the first correction;
+  \item as $R_z \to 0$ the posterior pose converges to $z$;
+  \item with constant synthetic biases, the bias estimates converge to within their own $3\sigma$;
+  \item update, injection and reset do not allocate;
+  \item a full MH\_01 run with noisy ground-truth updates neither diverges nor produces NaN, and the $\chi^2$ rejection
+        count is logged.
+\end{itemize}
+\end{projectlink}
+
+The ``second update'' test is subtle and worth understanding. After the first update, the nominal pose has moved
+toward $z$ by $K r$, so the second residual should be approximately $(I - HK)r$, which is smaller. If it is instead
+larger, or has the opposite sign, the injection used the wrong side of the quaternion product or the wrong sign of
+$H$.
+
+\begin{takeaways}
+\begin{itemize}
+  \item Derive $H$ by perturbing $h(\hat x\bplus\delta x)$, expanding to first order and reading off coefficients.
+  \item The nullspace of $H$ lists the error directions a sensor cannot see.
+  \item The pose sensor's attitude noise is a local perturbation, matching the residual $\Log_q(\hat q\inv\qprod q_{meas})$.
+  \item Unmeasured states are corrected through cross-covariances built up by propagation.
+  \item Gate with $\chi^2_{0.95}(\dim r)$, log the rejections, and treat a high rejection rate as a symptom of overconfidence.
+\end{itemize}
+\end{takeaways}
+
+\begin{exercises}
+  \item For the lever-arm example, compute $S$ and $K$ for a state with
+        \[ P = \diag(\sigma_p^2I,\ \sigma_v^2I,\ \sigma_\theta^2I,\ \sigma_{b_a}^2I,\ \sigma_{b_g}^2I). \]
+        Which components of $\delta\theta$ does the update correct?
+  \item Derive $H$ for a range measurement to a known beacon $b_w$: $z = \|p_{wb} - b_w\| + n$. What is its nullspace?
+  \item Simulate the death spiral: run a 1D constant-velocity filter with $Q$ underestimated by a factor of 100 and a
+        95\% gate. Plot the rejection rate and the error over time.
+  \item Show that with a pose measurement of a static vehicle, the horizontal accelerometer bias is observable.
+        (Hint: what does the attitude measurement remove from the tilt/bias ambiguity of \cref{ch:strapdown}?)
+  \item Prove that $P_{prior} - P_{post} = KSK\T \succeq 0$ for the optimal gain, and explain why this test can fail in floating
+        point if the simple covariance update is used.
+\end{exercises}

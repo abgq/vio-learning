@@ -1,0 +1,357 @@
+\chapter{Engineering a Real-Time Estimator in C++20}
+\label{ch:engineering}
+\chaptermark{Engineering in C++20} % short running header
+\sloppy % long code identifiers cannot be hyphenated
+
+\begin{objectives}
+\begin{itemize}
+  \item Know the C++ facts an estimator depends on: stack and heap, object lifetime, and the C++20 features the project uses.
+  \item Understand why a real-time estimator must be deterministic, and how the project's memory tiers achieve it.
+  \item Know how Eigen represents matrices, blocks and expressions, and use fixed-max-size matrices, member workspaces and
+        allocation guards correctly.
+  \item Avoid the Eigen pitfalls that silently corrupt numbers: dangling expression templates and aliasing.
+  \item Understand what the sanitizers check and how, and how a target-based CMake build is organized.
+  \item Design a test strategy in which every test can fail, and a systematic procedure for debugging a diverging filter.
+\end{itemize}
+\end{objectives}
+
+The mathematics of the previous chapters is necessary but not sufficient. An estimator that is mathematically correct can still
+miss its deadline because of an allocation, produce garbage because of an Eigen expression template, or pass all its tests because
+the tests cannot fail. This chapter collects the engineering practices that the project encodes in AGENTS.md.
+
+% ------------------------------------------------------------------------------
+\section{C++ essentials for estimator code}
+\label{sec:cpp-essentials}
+
+\subsection{Stack, heap and object lifetime}
+
+A C++ program keeps its data in two kinds of memory. The \term{stack} holds the local variables of the functions currently running. Entering a
+function reserves a block of it by moving a pointer, and leaving the function releases the block by moving the pointer back: the cost is a
+few instructions, it is the same every time, and the size of each block is fixed at compile time. The \term{heap} holds objects whose size or
+lifetime is decided at run time. Obtaining heap memory (\code{new}, \code{std::vector} growth, a dynamic-size Eigen matrix) calls the memory
+allocator, which must find a free block of the right size, may take a lock shared with other threads, and occasionally asks the operating
+system for more pages. Its cost is usually modest and occasionally large, which is exactly what a real-time loop cannot afford.
+
+Every C++ object has a lifetime that ends at a precisely defined point: a local variable when its scope closes, a member when its owner is
+destroyed. At that point its destructor runs. Tying resources (memory, files, locks) to object lifetime is called \term{RAII} (resource
+acquisition is initialization): a \code{std::vector} frees its heap block in its destructor, so it cannot leak. The project uses RAII
+everywhere and never calls \code{delete} by hand. The stack is small (typically \SI{1}{MB} on Windows, \SI{8}{MB} on Linux), so large
+matrices belong in class members created once, not in function locals.
+
+\subsection{The C++20 features the project uses}
+
+\begin{lstlisting}
+inline constexpr int kImuDim = 15;   // compile-time constant, one definition
+
+[[nodiscard]] bool update(const PoseMeasurement& z) noexcept; // result must be used
+void ingest(std::span<const ImuSample> samples) noexcept;     // view of contiguous data
+\end{lstlisting}
+
+\begin{itemize}
+  \item \code{constexpr} values are computed at compile time and can size arrays and Eigen matrices; \code{inline constexpr} in a header gives one
+        shared definition. Dimensions, indices (AGENTS.md C3) and the $\chi^2$ table are \code{constexpr}.
+  \item \code{[[nodiscard]]} makes the compiler warn (with \code{-Werror}, fail) when a caller ignores the return value: a rejected update or a failed
+        factorization must not be silently dropped.
+  \item \code{noexcept} promises that a function throws no exception. If one escapes anyway the program terminates, so the promise is only made
+        on the hot path, where errors are reported through return values instead.
+  \item \code{std::span<const T>} is a non-owning view (a pointer and a length) of contiguous elements. A function taking a span accepts an array, a
+        \code{std::vector} or part of one without copying and without caring who owns the memory.
+  \item \code{std::variant<A, B>} holds exactly one of several types, without heap allocation. \code{std::visit} calls the matching overload:
+\end{itemize}
+
+\begin{lstlisting}
+template <class... Ts> struct Overloaded : Ts... { using Ts::operator()...; };
+template <class... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
+
+for (const SensorEvent& event : events) {           // one presorted stream
+  std::visit(Overloaded{
+      [&](const ImuSample& s)  { filter.propagate(s); },
+      [&](const ImageEvent& e) { pipeline.on_image(e); },
+  }, event);
+}
+\end{lstlisting}
+
+\code{Overloaded} inherits the call operators of all the lambdas passed to it, so \code{std::visit} finds the one whose parameter type matches the
+alternative currently stored. Adding a new event type to the variant without handling it is a compile error, not a silent omission.
+
+% ------------------------------------------------------------------------------
+\section{Determinism and the memory tiers}
+
+A flight controller consumes the estimator's output at a fixed rate. A late estimate is a wrong estimate. The main source of
+unpredictable latency in C++ is dynamic memory allocation: \code{new}, a \code{std::vector} that grows, a dynamic-size Eigen temporary. The
+allocator may take locks, search free lists or ask the operating system for pages, with latency that is usually small and
+occasionally large. The project therefore separates three tiers (AGENTS.md E4).
+
+\begin{center}\small
+\begin{tabularx}{\textwidth}{@{}l X X@{}}
+\toprule
+Tier & Scope & Rule \\
+\midrule
+Load & parsing, building event arrays, constructing the filter & allocate freely, before streaming starts \\
+Core & \code{vio\_core}, per IMU sample and per update & zero heap allocations \\
+Frontend & OpenCV tracking & may allocate, must reuse buffers; allocations are measured and logged \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Fixed-max-size matrices}
+
+The MSCKF covariance changes size as clones come and go, but never exceeds $15 + 6N_{max}$. Eigen supports exactly this case: a
+matrix whose \emph{runtime} size is dynamic but whose \emph{maximum} size is a compile-time constant. Its storage is an inline array of the
+maximum size, so resizing within the bound never allocates.
+
+\begin{lstlisting}
+inline constexpr int kMaxClones = 10;                  // decided in M10a
+inline constexpr int kMaxDim    = 15 + 6 * kMaxClones;
+
+using CovMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                                Eigen::ColMajor, kMaxDim, kMaxDim>;
+
+CovMatrix P;          // inline storage for 75 x 75 doubles, no heap
+P.resize(15, 15);     // allowed: within the compile-time maximum
+\end{lstlisting}
+
+Large workspaces ($S$, $K$, stacked $H$, temporaries for $\Phi P$) are class members, created once, rather than function-local
+variables. Function-local fixed-max matrices would not allocate either, but they would live on the stack, and several of them at
+once can exceed it (\cref{ch:cloning}).
+
+\subsection{Proving it: allocation guards}
+
+``It shouldn't allocate'' is not evidence. The project overrides the global \code{operator new} in its tests to count allocations
+(\code{tests/support/alloc\_guard.hpp}), and wraps every core hot-path test with a guard that asserts a count of zero. In debug builds,
+\code{EIGEN\_RUNTIME\_NO\_MALLOC} together with \code{Eigen::internal::set\_is\_malloc\_allowed(false)} makes Eigen itself abort on any internal
+allocation and reports where it happened. The two mechanisms are complementary: the guard catches allocations anywhere, Eigen's flag
+pinpoints those inside Eigen.
+
+% ------------------------------------------------------------------------------
+\section{Eigen in brief}
+\label{sec:eigen-basics}
+\index{Eigen}\index{expression templates}
+
+\paragraph{The matrix type.} Every dense Eigen matrix is an instance of one class template,
+\begin{lstlisting}
+Eigen::Matrix<Scalar, Rows, Cols, Options, MaxRows, MaxCols>
+\end{lstlisting}
+\code{Rows} and \code{Cols} are either compile-time numbers (a \emph{fixed-size} matrix such as \code{Eigen::Matrix3d}, stored inline with no heap) or
+\code{Eigen::Dynamic} (size chosen at run time, normally on the heap, such as \code{Eigen::MatrixXd}). \code{MaxRows} and \code{MaxCols} give a dynamic
+matrix a compile-time upper bound, which turns its storage into an inline array: the fixed-max-size matrices used below. \code{Options} chooses the
+storage order.
+
+\paragraph{Storage order.} Memory is one-dimensional. A \emph{column-major} matrix (Eigen's default) stores column after column, so entry $(i, j)$ of
+an $m\times n$ matrix lives at offset $i + jm$; a \emph{row-major} matrix stores row after row, offset $j + in$. Loops are fastest when they walk
+memory contiguously, so with column-major storage the inner loop should run down a column. Mixing orders is legal but may force copies.
+
+\paragraph{Blocks.} \code{P.block(i, j, r, c)}, \code{P.topLeftCorner(15, 15)}, \code{v.segment<3>(6)} and their relatives return \emph{views}: they refer to
+the original storage, copy nothing, and can be assigned to. \code{P.block<3, 3>(6, 6) = ...} writes the attitude block of $P$ in place. The fixed-size
+forms (template arguments) let Eigen unroll small operations completely.
+
+\paragraph{Passing matrices and blocks to functions.} A parameter of type \code{const Eigen::Matrix3d\&} accepts only that exact type. To accept any
+matrix or block of compatible layout, use \code{Eigen::Ref<const Eigen::MatrixXd>} (read-only) or \code{Eigen::Ref<Eigen::MatrixXd>} (writable). A
+read-only \code{Ref} quietly makes a temporary copy when the argument's layout is incompatible, and for a dynamic type that copy allocates; a writable
+\code{Ref} refuses to compile instead. The allocation guard catches the quiet case.
+
+\paragraph{Wrapping existing memory.} \code{Eigen::Map<const Eigen::Vector3d> v(ptr)} views three doubles at \code{ptr} as a vector, without copying.
+It is the right tool for parsed buffers, and the wrong one for quaternions read from EuRoC: \code{Eigen::Map<Eigen::Quaterniond>} interprets memory as
+$(x, y, z, w)$, while the CSV stores $(w, x, y, z)$ (AGENTS.md C2).
+
+\paragraph{Expression templates.} \code{A + B} does not compute a matrix. It returns a small object recording ``the sum of \code{A} and \code{B}''. Only when
+that object is assigned to a matrix does Eigen run a loop, and it fuses the whole expression into it: \code{D = A + B + C} is one loop with no
+temporaries. Products are the exception: they are evaluated into a temporary unless told otherwise (below). This design makes Eigen fast, and it
+is also the source of the \code{auto} pitfall described next.
+
+\paragraph{Decompositions.} Linear systems are solved through decomposition objects: \code{S.llt().solve(B)} (Cholesky, for symmetric positive definite
+$S$), \code{.ldlt()} (robust for semi-definite), \code{.householderQr()} and \code{.colPivHouseholderQr()} (QR, \cref{ch:numlinalg}). A decomposition object owns
+a copy of the factor; for fixed-max matrices that copy is inline. \code{Eigen::LLT<Eigen::Ref<Eigen::MatrixXd>{}> llt(A)} factors \code{A} \emph{in place},
+overwriting it with the factor and allocating nothing. Symmetric structure can be exploited with \code{P.selfadjointView<Eigen::Lower>()}, which reads
+only one triangle.
+
+% ------------------------------------------------------------------------------
+\section{Eigen pitfalls}
+
+\paragraph{Expression templates and \code{auto}.} Eigen operations return lightweight \emph{expression} objects that are evaluated
+lazily when assigned to a matrix. Storing one with \code{auto} keeps references to its operands, which may be temporaries that no
+longer exist when the expression is finally evaluated.
+
+\begin{lstlisting}
+auto bad = R * (a + b);             // expression refers to the temporary (a + b)
+Eigen::Vector3d x = bad;            // undefined behavior: the temporary is gone
+Eigen::Vector3d good = R * (a + b); // evaluated immediately into a concrete type
+\end{lstlisting}
+
+The rule is simple: never use \code{auto} with Eigen expressions (AGENTS.md E5). Name the concrete type, or call \code{.eval()} when a
+temporary really is wanted. AddressSanitizer catches many of these bugs, but not all.
+
+\paragraph{Aliasing.} Eigen assumes that the destination of a matrix product may alias its operands and evaluates products into a
+temporary. With dynamic sizes that temporary allocates. When the destination is known not to alias, \code{.noalias()} writes directly
+into it. When it does alias, the temporary is required: write into a member workspace explicitly.
+
+\begin{lstlisting}
+tmp_15xN_.noalias() = Phi * P.topRightCorner(15, nc);  // reads P, writes workspace
+P.topRightCorner(15, nc) = tmp_15xN_;                   // copy back
+P.bottomLeftCorner(nc, 15) = tmp_15xN_.transpose();     // keep symmetry
+\end{lstlisting}
+
+Coefficient-wise operations do not alias-check. \code{A = A.transpose()} is the classic bug; use \code{A.transposeInPlace()} or symmetrize
+with a workspace.
+
+\paragraph{Passing and alignment.} Pass Eigen objects by \code{const\&} (or \code{Eigen::Ref} for blocks). Do not add
+\code{EIGEN\_MAKE\_ALIGNED\_OPERATOR\_NEW}: since C++17, aligned \code{new} handles over-aligned types. The real alignment hazard is mixing
+\code{-march} or alignment-changing flags between translation units or with dependencies, which the project forbids.
+
+\paragraph{Decompositions without allocation.} Eigen's decompositions normally own their storage. Fixed-max decomposition objects held as
+members, or the in-place variants that factor a matrix in its own storage, avoid per-call allocation. Whatever the API, verify with the
+allocation guard.
+
+% ------------------------------------------------------------------------------
+\section{Time and events}
+
+\begin{lstlisting}
+using Clock = std::chrono::nanoseconds;
+struct ImuSample   { Clock t; Eigen::Vector3d gyro, accel; };
+struct ImageEvent  { Clock t; int index; };
+using SensorEvent = std::variant<ImuSample, ImageEvent /*, PoseMeasurement */>;
+
+// Delta t: subtract in integers, convert only the difference.
+const double dt = std::chrono::duration<double>(t1 - t0).count();
+\end{lstlisting}
+
+Absolute time stays in 64-bit integer nanoseconds (\cref{sec:floating}). Events form one presorted sequence built at load time, so the
+streaming loop is a single pass over contiguous memory, dispatched with \code{std::visit} as in \cref{sec:cpp-essentials}: no priority queue, no
+allocation, no reordering surprises.
+
+% ------------------------------------------------------------------------------
+\section{Numerical robustness checklist}
+
+\begin{itemize}
+  \item Normalize every quaternion after every multiplicative update (propagation, injection, cloning).
+  \item Symmetrize $P$ after propagation and after every update.
+  \item Use the Joseph form; factor $S$ with Cholesky or LDL$^\mathsf{T}$; treat a failed factorization as an error to report, not to hide.
+  \item Guard every $0/0$ with Taylor branches; use $\atantwo$ for angles; handle $\Log$ near $\pi$.
+  \item Reject features with non-positive or tiny depth, poor parallax or large reprojection error before linearizing.
+  \item Count and log gate rejections and triangulation failures.
+  \item Never clamp negative eigenvalues of $P$ to hide a problem; find out why they appeared.
+  \item In debug builds, assert finiteness at module boundaries so that a \code{NaN} is caught where it is born.
+\end{itemize}
+
+% ------------------------------------------------------------------------------
+\section{Sanitizers}
+\label{sec:sanitizers}
+\index{sanitizers}\index{AddressSanitizer}\index{UndefinedBehaviorSanitizer}
+
+C++ leaves many errors undefined: reading past the end of an array, using memory after freeing it, overflowing a signed integer. Undefined
+behavior does not mean a crash; it means the compiler may assume it never happens, so the program can produce plausible wrong numbers, behave
+differently between builds, or fail far from the bug. Sanitizers are compiler-inserted checks that turn these silent errors into immediate,
+precise reports.
+\begin{itemize}
+  \item \textbf{AddressSanitizer} (ASan, \code{-fsanitize=address}) keeps a \emph{shadow memory}, one byte for every eight bytes of program memory,
+        recording which bytes may be accessed. Every heap block, stack variable and global is surrounded by poisoned \emph{redzones}, and freed
+        memory stays poisoned for a while. The compiler inserts a shadow check before every load and store. ASan reports heap, stack and
+        global buffer overflows, use after free, use after scope and double frees, with stack traces of the access and of the allocation. The
+        cost is roughly a factor of two in speed and three in memory.
+  \item \textbf{UndefinedBehaviorSanitizer} (UBSan, \code{-fsanitize=undefined}) inserts checks for signed integer overflow, out-of-range shifts, integer
+        division by zero, null and misaligned pointer use, invalid \code{bool} and \code{enum} values, and floating-point-to-integer conversions that
+        overflow.
+\end{itemize}
+By default UBSan prints a message and \emph{continues}, so a test that triggers it still passes. \code{-fno-sanitize-recover=all} makes every report
+abort the process, and the test preset sets \code{UBSAN\_OPTIONS=print\_stacktrace=1:halt\_on\_error=1} so the report carries a stack trace
+(AGENTS.md E3). Frame pointers (\code{-fno-omit-frame-pointer}) make those traces reliable. On Windows, LeakSanitizer does not exist, so leaks are
+not detected (RAII makes them rare), and an instrumented executable needs the ASan runtime DLL from \code{C:\textbackslash msys64\textbackslash clang64\textbackslash bin}
+on its \code{PATH}. Sanitizers are a debug-build tool: the \code{release} preset builds without them, and both presets must pass.
+
+% ------------------------------------------------------------------------------
+\section{Modern CMake in brief}
+\label{sec:cmake}
+\index{CMake}
+
+CMake describes a build as a set of \emph{targets} (libraries and executables) with properties. Modern CMake attaches every setting to a target
+rather than to global variables, and lets settings propagate along the dependency graph through three keywords:
+\code{PRIVATE} (used to build this target only), \code{INTERFACE} (used only by targets that link to this one) and \code{PUBLIC} (both). A library's public
+include directory is \code{PUBLIC}, because its users include its headers; a warning flag is \code{PRIVATE}, because it concerns only the library's
+own code.
+
+\begin{lstlisting}
+add_library(vio_warnings INTERFACE)            # carries flags, builds nothing
+target_compile_options(vio_warnings INTERFACE -Wall -Wextra -Wconversion -Werror)
+
+add_library(vio_core STATIC src/so3.cpp src/es_ekf.cpp)
+target_include_directories(vio_core PUBLIC include)
+target_link_libraries(vio_core PUBLIC Eigen3::Eigen PRIVATE vio_warnings)
+\end{lstlisting}
+
+The \code{vio\_warnings} target is how warnings stay off the dependencies (AGENTS.md E3): only project targets link it. Dependencies fetched with
+\code{FetchContent} at a pinned tag are declared \code{SYSTEM}, so their headers are included with \code{-isystem} and do not trigger the project's warnings.
+\code{CMakePresets.json} stores named configurations (generator, compiler, build type, flags, test environment), so that
+\code{cmake --preset debug-sanitize}, \code{cmake --build --preset debug-sanitize} and \code{ctest --preset debug-sanitize} reproduce exactly the same build
+on every machine. Catch2's \code{catch\_discover\_tests} registers each \code{TEST\_CASE} as a separate CTest test.
+
+% ------------------------------------------------------------------------------
+\section{Testing}
+
+\begin{keyidea}[a test must be able to fail]
+For every test, ask: would it still pass if I flipped the sign of X, transposed Y, or swapped two blocks? If yes, the test is
+decoration. Run it once against a deliberately broken implementation to make sure it fails.
+\end{keyidea}
+
+The project's test strategy layers several kinds of evidence.
+\begin{enumerate}
+  \item \textbf{Algebraic unit tests}: identities such as $\Log(\Exp(\phi)) = \phi$ at zero, tiny, generic and near-$\pi$ angles.
+  \item \textbf{Finite-difference Jacobian tests} built on $\bplus/\bminus$, at non-trivial states, with tolerances justified in a comment.
+  \item \textbf{Closed-form trajectory tests}: synthetic trajectories with analytic IMU data and convergence-order checks.
+  \item \textbf{Statistical tests}: Monte Carlo covariance checks and NEES/NIS with $\chi^2$ bounds, seeded with
+        \code{std::mt19937\_64}. Because \code{std::normal\_distribution} differs between standard libraries, never hard-code values from one
+        run; test statistical properties.
+  \item \textbf{Invariance tests}: cloning enabled versus disabled must give identical IMU estimates when no visual updates occur.
+  \item \textbf{Resource tests}: allocation guards around every core hot path.
+  \item \textbf{Sanitizers}: ASan and UBSan builds with \code{-fno-sanitize-recover=all}, so that any report fails the test run
+        (\cref{sec:sanitizers}).
+\end{enumerate}
+
+% ------------------------------------------------------------------------------
+\section{Debugging a diverging filter}
+
+When the full system misbehaves, resist the urge to tune. Work down the layers instead.
+\begin{enumerate}
+  \item Run on \textbf{synthetic data} with exactly modeled noise. If it fails there, the bug is in the code.
+  \item Disable visual updates. Does IMU-only propagation from ground truth behave as \cref{fig:cov-growth} predicts, with errors
+        inside $3\sigma$?
+  \item Replace visual updates by \textbf{pose updates} (Milestone 6). If those are consistent, the back end is sound.
+  \item Feed the MSCKF \textbf{ground-truth feature tracks} from a synthetic scene. If that works, the problem is in the front end or the
+        calibration.
+  \item On real data, plot each residual component over time and look for bias, oscillation or outliers.
+  \item Only then adjust noise parameters, and judge the result on consistency statistics.
+\end{enumerate}
+
+\section{Going further}
+
+Once the baseline MSCKF runs, natural extensions are First-Estimates Jacobians (\cref{ch:observability}); online calibration of the
+camera-IMU extrinsics and time offset~\cite{li2013msckf2, li2014timeoffset}; stereo observations from \code{cam1}; keeping long-lived
+features as SLAM landmarks; zero-velocity updates; and evaluation on the harder EuRoC sequences (V1\_03, MH\_05) and other
+datasets. Each extension adds states and Jacobians, and each Jacobian gets its derivation and its finite-difference test.
+
+\begin{takeaways}
+\begin{itemize}
+  \item Heap allocation has unpredictable cost; the stack is cheap but small. Large workspaces are members, created once.
+  \item Determinism requires zero allocation in the core: fixed-max-size matrices, member workspaces, proven by allocation guards.
+  \item Never use \code{auto} with Eigen expressions; use \code{.noalias()} only when there is no aliasing.
+  \item Keep time in integer nanoseconds and process one presorted event stream.
+  \item Sanitizers turn undefined behavior into reports; without \code{-fno-sanitize-recover=all} UBSan reports do not fail tests.
+  \item Every test must be able to fail; layer algebraic, Jacobian, closed-form, statistical and resource tests.
+  \item Debug by removing layers until the failure disappears, not by tuning.
+\end{itemize}
+\end{takeaways}
+
+\begin{exercises}
+  \item Write a minimal allocation guard by overriding the global \code{operator new} and \code{operator delete}, and show that it detects a
+        \code{std::vector::push\_back} beyond capacity but not a fixed-max Eigen \code{resize}.
+  \item Construct an example in which \code{auto} with an Eigen expression produces wrong numbers without crashing. Does
+        AddressSanitizer report it?
+  \item Measure the time of 10\,000 covariance propagation steps with fixed-max and with fully dynamic Eigen matrices, in both build
+        presets. Explain the difference.
+  \item Take one of your Jacobian tests, break the Jacobian in three different ways, and record which breakages the test detects.
+  \item Write a function that reads one element past the end of a \code{std::array} and another that overflows an \code{int}. Build both presets and
+        record what each sanitizer reports, and what the release build does.
+  \item Pass a row-major block to a function taking \code{Eigen::Ref<const Eigen::MatrixXd>} inside an allocation guard. What happens, and what
+        happens if the parameter is a writable \code{Ref}?
+  \item Add a third alternative to the \code{SensorEvent} variant without handling it in the \code{Overloaded} visitor. Read the compiler error.
+\end{exercises}
+\fussy
