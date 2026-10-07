@@ -18,6 +18,8 @@ include(cmake/Dependencies.cmake)
 # ---------------------------------------------------------
 add_library(vio_core STATIC src/dummy.cpp)
 
+target_include_directories(vio_core PUBLIC include)
+
 # Propagate Eigen headers downstream, but keep strict warnings private
 target_link_libraries(vio_core
     PUBLIC Eigen3::Eigen
@@ -41,3 +43,11 @@ target_link_libraries(test_milestone1
 # Register tests dynamically with CTest
 include(Catch)
 catch_discover_tests(test_milestone1)
+
+add_executable(test_milestone2 tests/test_milestone2.cpp)
+target_link_libraries(test_milestone2 
+    PRIVATE Catch2::Catch2WithMain
+    PRIVATE vio_core
+    PRIVATE vio_warnings
+)
+catch_discover_tests(test_milestone2)

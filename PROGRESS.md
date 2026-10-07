@@ -4,7 +4,7 @@ Shared handoff file between AI models and sessions. Read it at the start of ever
 
 ## Current Status
 - **Milestone:** 2 - 3D Lie Group Math on SO(3)
-- **Status:** Not started
+- **Status:** In Progress
 
 ## Decision Log
 | Date | Decision | Rationale |
@@ -33,7 +33,7 @@ The Milestone 1 exit criterion still requires repeating this proof inside the CT
 | Milestone | Status | Completed | Checkpoint review | Notes |
 |---|---|---|---|---|
 | 1 | Completed | 2026-10-01 | - | Build harness verified with ASan/UBSan, Catch2, Eigen, and AllocGuard. |
-| 2 | Not started | | Required | |
+| 2 | In Progress | | Required | |
 | 3 | | | - | |
 | 4 | | | - | |
 | 5 | | | Required | |
