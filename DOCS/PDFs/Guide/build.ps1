@@ -33,7 +33,9 @@ function Invoke-LaTeX([string]$JobName, [string]$Source) {
             Select-String -Path "$JobName.log" -Pattern '^!' -Context 0, 6 | Select-Object -First 3
             throw "pdflatex failed for $JobName (pass $pass); see $JobName.log"
         }
-        if ($pass -eq 1) {
+        # Rebuild the index after passes 1 and 2: page numbers recorded on pass 1 can still move
+        # once cross-references resolve, so pass 3 typesets an index from the settled layout.
+        if ($pass -le 2) {
             makeindex -q "$JobName.idx" | Out-Null
             if ($LASTEXITCODE -ne 0) { throw "makeindex failed for $JobName" }
         }

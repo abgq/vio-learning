@@ -1,0 +1,92 @@
+% Solutions to the exercises of Chapter 8.
+\begin{solutions}
+  \item If $X\T = -X$ and $Y\T = -Y$ then $[X, Y]\T = Y\T X\T - X\T Y\T = YX - XY = -[X, Y]$, so the commutator of two skew-symmetric matrices is
+        skew-symmetric: $\so$ is closed under the bracket (it is a \emph{Lie algebra}). The formula for the bracket is \eqref{eq:skew-commutator}:
+        $[\sx{a}, \sx{b}] = \sx{a}\sx{b} - \sx{b}\sx{a} = \sx{a\times b}$, proved in Exercise 2.5. The bracket of two infinitesimal rotations is the
+        infinitesimal rotation about the cross product of their axes.
+
+  \item By property 4 of \cref{prop:matexp}, $\Exp(\phi)\T = \exp(\sx{\phi})\T = \exp(\sx{\phi}\T) = \exp(-\sx{\phi}) = \Exp(-\phi)$. The matrices $s\sx{\phi}$
+        and $t\sx{\phi}$ commute (both are multiples of the same matrix), so by property 3, $\exp(s\sx{\phi})\exp(t\sx{\phi}) = \exp((s + t)\sx{\phi})$.
+        There is no contradiction: rotations about the \emph{same} axis commute, as planar rotations do (\cref{sec:so2}); non-commutativity concerns
+        rotations about different axes. The curve $t \mapsto \Exp(t\phi)$ is a one-parameter subgroup, a commutative copy of $\mathrm{SO}(2)$ inside $\SO$.
+
+  \item For $R = \Exp(\theta u)$ with a fixed unit axis and $\theta$ from $10^{-2}$ down to $10^{-10}$, the relative errors of the two angle formulas are
+        \begin{center}\small
+        \begin{tabular}{@{}l c c c c c@{}}
+        \toprule
+        $\theta$ & $10^{-2}$ & $10^{-4}$ & $10^{-6}$ & $10^{-8}$ & $10^{-10}$ \\
+        \midrule
+        $\arccos\big((\tr R - 1)/2\big)$ & $2\times10^{-12}$ & $3\times10^{-9}$ & $4\times10^{-5}$ & $1$ (returns 0) & $1$ \\
+        $\atantwo$ form of \eqref{eq:Log} & $2\times10^{-16}$ & $0$ & $0$ & $0$ & $0$ \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        reproducing \cref{fig:taylor}(b): $\arccos$ loses accuracy like $u/\theta^2$ because $(\tr R - 1)/2 = \cos\theta \approx 1 - \theta^2/2$ carries an absolute error
+        $u$ that $\arccos$ amplifies by $1/\sin\theta$. For the near-$\pi$ test, at $\theta = \pi - 10^{-6}$ the naive formula
+        $\frac{\theta}{2\sin\theta}(R - R\T)\veeop$ is still accurate to $2\times10^{-10}$, but at $\theta = \pi$ it divides $0$ by $0$ and returns garbage. The
+        branch built from the symmetric part, $uu\T = (\tfrac12(R + R\T) - \cos\theta\,I)/(1 - \cos\theta)$, is accurate to $10^{-15}$ at both angles. At
+        exactly $\pi$ both $\pi u$ and $-\pi u$ are correct answers, so the test must accept either sign (or compare $\Exp$ of the result with $R$).
+
+  \item Write $\Jr = I - B\sx{\phi} + C\sx{\phi}^2$. By the error model of \cref{sec:taylor}, the closed forms of $B$ and $C$ have absolute rounding errors of
+        about $u/\theta^2$, multiplied by $\|\sx{\phi}\| = \theta$ and $\|\sx{\phi}^2\| = \theta^2$ respectively; the $B$ term dominates with a matrix error of about
+        $u/\theta$. This is below $10^{-14}$ for $\theta \ge u/10^{-14} \approx 0.011$. A threshold $\theta_0 = 0.02$ therefore makes the closed form safe
+        above it. Below it, a series truncated after the $\theta^{2m}$ term errs by roughly its first omitted term:
+        \begin{itemize}[leftmargin=1.2em]
+          \item two terms: $B$ errs by $\theta^4/720 \approx 2\times10^{-10}$ at $\theta_0$, times $\theta_0$ gives $4\times10^{-12}$: not enough;
+          \item three terms, $B \approx \tfrac12 - \tfrac{\theta^2}{24} + \tfrac{\theta^4}{720}$ and $C \approx \tfrac16 - \tfrac{\theta^2}{120} + \tfrac{\theta^4}{5040}$: the omitted terms
+                $\theta^6/40320$ and $\theta^6/362880$ contribute $\theta_0^7/40320 \approx 3\times10^{-17}$ and less.
+        \end{itemize}
+        So use three terms below $\theta_0 = 0.02$ and the closed form above. Compared with a 50-digit reference, this scheme's largest error over
+        $[0, 0.1]$ is $1.1\times10^{-15}$, while the closed form alone reaches $3.5\times10^{-9}$ at small angles (and \code{NaN} at zero). The rounding bound
+        $u/\theta$ is pessimistic: at $\theta = 0.02$ the closed form's actual error is $7\times10^{-16}$.
+
+  \item \ifsolutions
+        Let $\phi = \Log(\hat R\T R)$. Perturbing $R$ and $\hat R$ locally, and using \eqref{eq:bch-right} and \eqref{eq:bch-left},
+        \begin{align*}
+          f(R\Exp(\delta)) &= \Log\big(\hat R\T R\Exp(\delta)\big) = \Log\big(\Exp(\phi)\Exp(\delta)\big) = \phi + \Jrinv(\phi)\,\delta + O(\|\delta\|^2), \\
+          g(\hat R\Exp(\delta)) &= \Log\big(\Exp(-\delta)\hat R\T R\big) = \Log\big(\Exp(-\delta)\Exp(\phi)\big) = \phi - \Jlinv(\phi)\,\delta + O(\|\delta\|^2),
+        \end{align*}
+        so $\partial f/\partial\delta = \Jrinv(\phi)$ and $\partial g/\partial\delta = -\Jlinv(\phi)$. At $R = \hat R$, $\phi = 0$ and $\Jr(0) = \Jl(0) = I$, so the Jacobians are $+I$ and $-I$: an attitude
+        residual $\Log(\hat R\T R)$ moves one for one with a body-frame error of either rotation, with opposite signs. Away from $R = \hat R$ the inverse
+        Jacobians are the corrections an iterated update needs.
+        \else\withheldsolution\fi
+
+  \item From \eqref{eq:jr-def} and the adjoint identity \eqref{eq:adjoint},
+        \[
+          \Exp(\phi + \delta) \approx \Exp(\phi)\Exp(\Jr\delta) = \Exp\big(\Exp(\phi)\Jr\delta\big)\,\Exp(\phi);
+        \]
+        comparing with the left form of \eqref{eq:jr-def} gives $\Jl(\phi) = \Exp(\phi)\Jr(\phi)$. For the BCH formula, move the left factor to the right with the adjoint:
+        \[
+          \Log\big(\Exp(\delta)\Exp(\phi)\big) = \Log\big(\Exp(\phi)\Exp(\Exp(\phi)\T\delta)\big) = \phi + \Jrinv(\phi)\Exp(\phi)\T\delta + O(\|\delta\|^2),
+        \]
+        by \eqref{eq:bch-right}, and $\Jrinv(\phi)\Exp(\phi)\T = \big(\Exp(\phi)\Jr(\phi)\big)\inv = \Jlinv(\phi)$, which is \eqref{eq:bch-left}.
+
+  \item With no new information the world-frame covariance $P_w = \hat RP_b\hat R\T$ does not change; only its body-frame coordinates do. Level means
+        $\hat R = I$; after pitching by $90^\circ$, $\hat R' = R_y(90^\circ)$, so
+        \[
+          P_b' = R_y(90^\circ)\T P_b\,R_y(90^\circ) = \diag(\sigma_y^2,\ \sigma_r^2,\ \sigma_r^2).
+        \]
+        The large yaw uncertainty, which is uncertainty about rotations about the world vertical, now sits in the $(x, x)$ entry, because after the
+        pitch the body $x$-axis is vertical. Nothing was learned or forgotten: the same uncertainty is described in rotated coordinates
+        (\cref{rem:cov-rotates}). A test that expects each diagonal entry of $P_{\theta\theta}$ to grow monotonically during propagation is therefore wrong.
+
+  \item The script perturbs the input with the appropriate $\bplus$ and compares central differences, formed with the appropriate $\bminus$,
+        against each analytic entry at a random point ($\|\phi\| = 1.6$, random $R$, $R_2$, $v$):
+\begin{lstlisting}[style=py]
+def num(f, plus, minus, h=1e-6):
+    return np.column_stack([minus(f(plus(h * e)), f(plus(-h * e))) / (2 * h) for e in np.eye(3)])
+vec = lambda a, b: a - b
+rot = lambda a, b: Log(b.T @ a)           # local difference on SO(3)
+loc = lambda X: (lambda d: X @ Exp(d))    # local perturbation of a rotation
+checks = {"Rv":    (num(lambda X: X @ v, loc(R), vec),       -R @ skew(v)),
+          "R^T v": (num(lambda X: X.T @ v, loc(R), vec),     skew(R.T @ v)),
+          "R^-1":  (num(lambda X: X.T, loc(R), rot),         -R),
+          "R1R2":  (num(lambda X: X @ R2, loc(R), rot),      R2.T),
+          "Exp":   (num(Exp, lambda d: phi + d, rot),        Jr(phi)),
+          "Log":   (num(Log, loc(Exp(phi)), vec),            Jrinv(phi)),
+          "Exp v": (num(lambda p: Exp(p) @ v, lambda d: phi + d, vec), -Exp(phi) @ skew(v) @ Jr(phi))}
+for name, (n, a) in checks.items(): print(name, np.abs(n - a).max())
+\end{lstlisting}
+        All rows agree to $10^{-10}$ (the remaining two rows, $\partial(R_1R_2)/\partial R_2 = I$ and $\partial(Rv)/\partial v = R$, likewise). Replacing $-R\sx{v}$ by
+        $+R\sx{v}$ raises the first error to about $3$: the test detects the flipped sign by ten orders of magnitude, as a good test should.
+\end{solutions}

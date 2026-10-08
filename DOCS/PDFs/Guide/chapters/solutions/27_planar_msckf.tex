@@ -1,0 +1,113 @@
+% Solutions to the exercises of Chapter 27.
+\begin{solutions}
+  \item At a random clone pose and a feature with $\hat z = 0.3$, central differences with $\varepsilon = 10^{-6}$ agree with \eqref{eq:planar-H} to $10^{-10}$ in all five entries. For the
+        heading entry, $\beta = \arctan z$ is the angle between the body axis $x_b$ and the ray to the feature. Turning the robot left by $\delta\psi$ turns the body axis
+        toward the ray, so every bearing \emph{decreases} by exactly $\delta\psi$, whatever the depth: $\delta\beta = -\delta\psi$. Since $z = \tan\beta$,
+        \[
+          \frac{\partial z}{\partial\delta\psi} = \frac{\dd z}{\dd\beta}\,\frac{\partial\beta}{\partial\delta\psi} = \frac{1}{\cos^2\beta}\,(-1) = -(1 + \tan^2\beta) = -(1 + z^2).
+        \]
+        The factor $1 + z^2$ only converts angle to normalized coordinate: at the edge of the $\pm50^\circ$ field of view it is $2.4$, while in angle every point moves
+        by the same $\delta\psi$.
+
+  \item The top-right block of $I + F_c\Dt$ is $\Omega R(\hat\psi_k)e_1v_m\Dt$, while that of $\Phi_k$ is $\Omega(\hat p_{k+1} - \hat p_k) = \Omega R(\hat\psi_k + \tfrac12\omega_m\Dt)e_1v_m\Dt$. With
+        $R(\hat\psi_k + \tfrac12\omega_m\Dt) = R(\hat\psi_k)(I + \tfrac12\omega_m\Dt\,\Omega) + O(\Dt^2)$ and $\Omega^2 = -I$,
+        \[
+          \Phi_k - (I + F_c\Dt) = \begin{bmatrix} 0 & -\tfrac12v_m\omega_m\Dt^2\,R(\hat\psi_k)e_1 \\ 0 & 0\end{bmatrix} + O(\Dt^3).
+        \]
+        The term is $\tfrac12\Dt^2\,\Omega\ddot{\hat p}$: the nominal path turns during the step, so its displacement is not $\dot{\hat p}_k\Dt$. Note that $F_c^2 = 0$, so for a
+        \emph{constant} $F_c$ the matrix exponential would add nothing. The whole difference comes from $F_c$ changing during the step: $I + F_c\Dt$ is the rectangle rule for
+        $I + \int F_c\,\dd t$. For the simulation ($v = 1$~m/s, $\omega = 0.1$~rad/s, $\Dt = 0.01$~s) it is $5\times10^{-6}$ per step, relative size $\tfrac12\omega\Dt = 5\times10^{-4}$. It is small,
+        but it means the approximate transitions no longer telescope exactly into $\Omega(\hat p_k - \hat p_0)$ (\cref{ch:observability}).
+
+  \item With $\omega = \omega_m - b_\omega - n_\omega$ and the nominal $\dot{\hat\psi} = \omega_m - \hat b_\omega$, $\dot{\delta\psi} = -\delta b_\omega - n_\omega$ and $\dot{\delta b}_\omega = n_b$; the position row is unchanged. For
+        $\delta x_R = (\delta p, \delta\psi, \delta b_\omega)$ and $n = (n_v, n_\omega, n_b)$,
+        \[
+          F_c = \begin{bmatrix} 0_{2\times2} & \Omega R(\hat\psi)e_1v_m & 0_{2\times1} \\ 0 & 0 & -1 \\ 0 & 0 & 0 \end{bmatrix}, \qquad
+          G_c = \begin{bmatrix} -R(\hat\psi)e_1 & 0 & 0 \\ 0 & -1 & 0 \\ 0 & 0 & 1 \end{bmatrix},
+        \]
+        with $Q_c = \diag(\sigma_v^2, \sigma_\omega^2, \sigma_b^2)$: the new column of $F_c$ is $(0, 0, -1, 0)\T$ and the new row of $G_c$ is $(0, 0, 1)$. The camera measures relative headings of
+        the clones directly: the heading column $-(1 + z^2)$ does not depend on depth, and turning a single clone is visible. A bias error makes the heading error grow
+        linearly across the window, $\delta\psi(t) = \delta\psi_0 - t\,\delta b_\omega$. The unobservable directions cannot produce such a ramp: a global rotation adds the same constant to every
+        heading, and translations and scale leave headings unchanged. So the ramp changes the projected residuals, and the bias is observable. Numerically: on
+        the simulated circle with ten clones and six landmarks, the observability matrix of $(\delta p, \delta\psi, \delta b_\omega)$ at the first clone time has rank one. Its
+        three-dimensional nullspace (the two translations and the rotation) has bias components of $10^{-14}$.
+        \ifsolutions
+        In three dimensions the attitude row is $\dot{\delta\theta} = -\sx{\hat\omega}\delta\theta - \delta b_g - n_g$ and the bias row $\dot{\delta b}_g = n_{b_g}$. The $-I$ in the gyro-bias columns is the exact
+        counterpart of the $-1$ here. The extra term $-\sx{\hat\omega}\delta\theta$ has no planar analog, because a planar heading error does not rotate with the body. For the same
+        reason as here, all three gyroscope-bias components are observable once the camera measures relative attitudes: even the bias about the vertical,
+        although the global yaw is not.
+        \else
+        In three dimensions the same mechanism makes all three gyroscope-bias components observable once the camera measures relative attitudes: even the bias
+        about the vertical, although the global yaw is not. (The corresponding block of $F_c$ is part of the derivation exercises of \cref{ch:errordyn}.)
+        \fi
+
+  \item The body-frame points are $(4, 1)$, $(4, 0)$, $(4, -2)$, so $\hat z = (\tfrac14, 0, -\tfrac12)$ and
+        \[
+          H_f = \begin{bmatrix} -\tfrac1{16} & \tfrac14 \\ 0 & \tfrac14 \\ \tfrac18 & \tfrac14 \end{bmatrix}, \qquad
+          h_1\times h_2 = \tfrac1{64}(-2, 3, -1), \qquad a = \tfrac1{\sqrt{14}}(2, -3, 1),
+        \]
+        so $r_o = (2r_1 - 3r_2 + r_3)/\sqrt{14}$. For sideways motion at a fixed heading, $z_i = (y_f - y_i)/x_f$ is a linear function of the camera position $y_i = (-1, 0, 2)$, and
+        the weights annihilate exactly the constants and the linear functions: $\sum_ia_i = 0$ and $\sum_ia_iy_i = 0$. For baselines $b_1 = y_2 - y_1$ and $b_2 = y_3 - y_2$, the weights are
+        $(b_2, -(b_1 + b_2), b_1)$, and $r_o = 0$ exactly when
+        \[
+          \frac{z_1 - z_2}{z_2 - z_3} = \frac{b_1}{b_2} .
+        \]
+        The depth $x_f$ cancels in the ratio of image displacements, so the residual compares the observed ratio with the estimated ratio of the baselines, and
+        nothing else. If the middle clone were really at $y = 0.1$, the observed ratio would be $1.1/1.9 = 0.58$ instead of $\tfrac12$, and $r_o = -0.020$. The projected Jacobian
+        is $H_o = \tfrac1{\sqrt{14}}\big[(\tfrac18, -\tfrac12, -\tfrac{17}8)\ \ (0, \tfrac34, 3)\ \ (-\tfrac18, -\tfrac14, -\tfrac54)\big]$; translation, rotation and scale of the configuration give zero, as before.
+
+  \item With $a = (1, -2, 1)/\sqrt6$, the $\delta p_x$ entries of $H_o$ are $\tfrac{1}{16\sqrt6}$, $0$ and $-\tfrac{1}{16\sqrt6}$. Moving the middle clone along $x_w$ is invisible; moving the first clone
+        along $x_w$ is visible, though weakly. The middle clone looks straight at the feature ($\hat z_2 = 0$), so $x_w$ is its own viewing ray, the nullspace of its projection
+        Jacobian: moving along the ray changes the depth, which one view cannot see, and leaves the bearing unchanged. The first clone sees the feature at
+        $\hat z_1 = \tfrac14$ ($14^\circ$). Moving it along $x_w$ changes that bearing by $\tfrac{1}{16}$ per meter, and the feature cannot absorb the change without disturbing the other two bearings. In
+        general, moving a clone along its ray to a feature is invisible in that feature's residual. Other directions are visible, with a sensitivity
+        proportional to the sine of the angle between motion and ray, divided by the depth.
+
+  \item Each observation gives as many numbers as the image has dimensions, and the feature has as many unknowns as the space. A 1D camera in the plane: $H_{f,j}$ is
+        $M\times2$ of rank 2, leaving $M - 2$ constraints, so $M = 2$ gives none. Two rays in a plane always intersect (unless parallel), so any two bearings are consistent with some
+        feature. A 2D camera in space: $H_{f,j}$ is $2M\times3$ of rank 3, leaving $2M - 3$, so $M = 2$ gives one. Two rays in space are generically skew, and requiring them to intersect,
+        i.e.\ to be coplanar with the baseline, is the epipolar constraint (Exercise~26.3).
+
+  \item Final RMS errors after 90~s over 30 runs (dead reckoning: $2.80$~m):
+        \begin{center}\small
+        \begin{tabular}{@{}l c c c c@{}}
+        \toprule
+        $N_{\max}$ (window length) & 3 (0.3~s) & 5 (0.5~s) & 10 (1~s) & 20 (2~s) \\
+        \midrule
+        position & 2.23~m & 2.13~m & 0.85~m & 0.33~m \\
+        heading & 0.19~rad & 0.17~rad & 0.069~rad & 0.025~rad \\
+        average NEES (last 9~s, 3 DOF) & 2.65 & 2.97 & 3.14 & 3.20 \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        The position error follows the heading error, which turns into cross-track error. The key quantity is how well one window determines the heading
+        change across it, a heading ramp, which the camera sees only through parallax. With the scenario's landmarks, a single window determines it with a
+        standard deviation of $0.05$, $0.022$, $0.008$ and $0.003$~rad for $N_{\max} = 3$, 5, 10, 20. Odometry alone has $\sigma_\omega\sqrt T = 0.009$, $0.013$, $0.019$ and $0.028$~rad over the same spans.
+        Short windows are worse than odometry at exactly the quantity that drives the drift; the camera wins only for windows longer than about half a second,
+        which is where the error drops. The benefit then levels off: $0.18$~m at $N_{\max} = 40$ and $0.17$~m at 80. Several things limit it:
+        \begin{itemize}
+          \item once the window pins the heading change far better than odometry, the remaining error is the unobservable drift of global heading and
+                position, which no window removes;
+          \item tracks end (here a landmark stays in view for a median of 6.8~s), so a longer window cannot lengthen them;
+          \item the cost grows as $n^3$ with $n = 3 + 3N_{\max}$;
+          \item old clones are never relinearized;
+          \item the NEES creeps upward ($3.24$ at $N_{\max} = 80$), as more constraints feed more spurious heading information (\cref{ch:observability}).
+        \end{itemize}
+
+  \item Let $h(x, p_f) = \pi\big(R(\psi_i)\T(p_f - p_i)\big)$, or any function of $R(\psi_i)\T(p_f - p_i)$. Translating everything by $t$ ($p_i \to p_i + t$, $p_f \to p_f + t$) leaves $p_f - p_i$ unchanged.
+        Rotating everything about the origin by $\delta$ ($p_i \to R(\delta)p_i$, $\psi_i \to \psi_i + \delta$, $p_f \to R(\delta)p_f$) gives
+        $R(\psi_i + \delta)\T R(\delta)(p_f - p_i) = R(\psi_i)\T R(\delta)\T R(\delta)(p_f - p_i) = R(\psi_i)\T(p_f - p_i)$. So $h$ is constant along both families, identically in $t$ and $\delta$.
+        Differentiating at $t = 0$ and $\delta = 0$, at the common linearization point $(\hat x, \hat p_f)$: the state moves along $N_t$ and the feature by $I$, or the state along $N_r$ and the
+        feature by $\Omega\hat p_f$. Hence
+        \[
+          H_{x,j}N_t + H_{f,j} = 0, \qquad H_{x,j}N_r + H_{f,j}\,\Omega\hat p_f = 0,
+        \]
+        and multiplying by $A_j\T$ gives $H_{o,j}N = 0$. Nothing about $\pi$ was used. The proof also shows why the hypothesis matters: the identities come from differentiating one
+        function at one point, so they hold only if every block of $H_{x,j}$ and $H_{f,j}$ is evaluated at the same estimates.
+
+  \item Each observation $(\|d_i\|, \atantwo(d_y, d_x))$ now gives two numbers for two unknowns of the feature, so a feature seen $M$ times gives $2M - 2$ constraints. A single
+        observation determines the feature and constrains nothing; two observations already give two constraints. None of the directions of
+        \eqref{eq:planar-nullspace} becomes observable: the measurement is still a function of $R(\psi_i)\T(p_f - p_i)$ alone, so the argument of Exercise~8 applies unchanged, and global
+        translation and heading remain invisible. What changes is scale. The range measures distances, so the shape \emph{and size} of the trajectory are now
+        observable from the camera alone, and the along-track error no longer depends on the odometry speed noise only.
+\end{solutions}

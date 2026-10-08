@@ -1,0 +1,50 @@
+% Solutions to the exercises of Chapter 15.
+\begin{solutions}
+  \item At rest the accelerometer measures the specific force $f = R_{wb}\T(a_w - g_w) = R_{wb}\T(0, 0, g)$ (\eqref{eq:imu-model} without bias and noise). With
+        $R_{wb} = R_x(10^\circ)$,
+        \[
+          f = R_x(10^\circ)\T\begin{bmatrix}0\\0\\g\end{bmatrix} = \begin{bmatrix}0\\ g\sin10^\circ\\ g\cos10^\circ\end{bmatrix} = \begin{bmatrix}0\\ 1.70\\ 9.66\end{bmatrix}~\mathrm{m/s^2}.
+        \]
+        The $y$-component reveals the tilt, with a positive sign: a positive rotation about $x$ lifts the body $y$-axis ($R_{wb}e_y = (0, \cos10^\circ, \sin10^\circ)$), so the
+        upward reaction to gravity has a positive component along it. The magnitude is still $g$; only its direction in the body frame has changed.
+
+  \item At frequencies far below resonance the deflection is $x = (a - g)/\omega_n^2$ (\cref{eq:accel-dynamics}), so the static sensitivity is
+        \[
+          \frac{1}{\omega_n^2} = \frac{1}{(2\pi\cdot5000~\mathrm{Hz})^2} = 1.0\times10^{-9}~\mathrm{m\ per\ m/s^2},
+        \]
+        one nanometre per $\mathrm{m/s^2}$, about five silicon atoms; the full $1g$ deflects the proof mass by about 10~nm. A noise floor of
+        $2\times10^{-3}~\mathrm{m/s^2/\sqrt{Hz}}$ over a 100~Hz bandwidth ($0.02~\mathrm{m/s^2}$) corresponds to a displacement of $2\times10^{-11}$~m, a tenth of an atom.
+        This is possible only because the capacitive readout measures the \emph{average} position of a large electrode, over many atoms, at a
+        frequency where thermal and electronic noise can be filtered. It also explains the trade-off of \cref{ch:imu}: a stiffer (higher-frequency)
+        sensor has more bandwidth but smaller deflections and therefore more relative noise.
+
+  \item In the frame of the sensor, which rotates with angular velocity $\Omega$, \eqref{eq:coriolis} says that a mass moving with relative velocity $\dot r$
+        experiences, besides its true acceleration, the apparent accelerations $-2\,\Omega\times\dot r$ and $-\Omega\times(\Omega\times r)$. For the drive motion
+        $\dot r = A\omega_d\cos(\omega_dt)\,e_x$ and a rate $\Omega_z$ about $z$,
+        \[
+          -2\,\Omega\times\dot r = -2\Omega_zA\omega_d\cos(\omega_dt)\,(e_z\times e_x) = -2\Omega_zA\omega_d\cos(\omega_dt)\,e_y ,
+        \]
+        which is \eqref{eq:gyro-coriolis}: an oscillation along $y$ at the drive frequency, with amplitude proportional to $\Omega_z$. The centripetal term is quadratic in $\Omega$ and does not oscillate at $\omega_d$, so demodulation at the drive frequency rejects it.
+        In a tuning fork the two masses are driven in anti-phase: their velocities, and therefore their Coriolis accelerations, are opposite, while a
+        linear acceleration pushes both the same way. The differential readout (difference of the two sense displacements) doubles the Coriolis
+        signal and cancels the common linear acceleration; imperfect matching of the two masses leaves the small residual $g$-sensitivity of
+        \cref{tab:imu-errors}.
+
+  \item With the formulas of the six-position test,
+        \[
+          b = \frac{9.83 + (-9.79)}{2} = 0.02~\mathrm{m/s^2} \ (\approx 2~\mathrm{mg}), \qquad 1 + s = \frac{9.83 - (-9.79)}{2\cdot9.81} = 1.000 ,
+        \]
+        so this axis has a bias of $0.02~\mathrm{m/s^2}$ and no measurable scale error. (The scale factor is relative to the gravity value used; with the local
+        $g$ instead of $9.81$, $s$ would change by the relative difference, a few parts in $10^4$ in practice.)
+
+  \item Using $1\,^\circ/\sqrt{\mathrm h} = \frac{\pi/180~\mathrm{rad}}{\sqrt{3600~\mathrm s}} = 2.909\times10^{-4}~\mathrm{rad/s/\sqrt{Hz}}$, an ARW of $0.2\,^\circ/\sqrt{\mathrm h}$ is
+        $\sigma_g = 5.82\times10^{-5}~\mathrm{rad/s/\sqrt{Hz}}$. At 400~Hz each sample has standard deviation $\sigma_g/\sqrt\Dt = 5.82\times10^{-5}\sqrt{400} =
+        1.16\times10^{-3}~\mathrm{rad/s}$. For comparison, EuRoC's gyroscope ($1.7\times10^{-4}$) has about three times this ARW.
+
+  \item The reading is $(1 + s)\omega$, so the error is $s\omega = 10^{-3}~\mathrm{rad/s}$ at 1~rad/s: an equivalent bias of $10^{-3}$~rad/s ($0.06\,^\circ$/s), larger than the
+        EuRoC gyro's noise over most horizons. A constant-bias model cannot absorb it during maneuvers because the error is proportional to the rate:
+        it changes sign when the vehicle turns the other way, vanishes when it stops, and doubles when it turns twice as fast. A random-walk bias
+        changes slowly by assumption, so the filter either lags behind these changes or, if the bias process noise is inflated to follow them,
+        loses its ability to estimate the true bias. Each full turn accumulates an attitude error of $2\pi s = 6.3$~mrad, in the plane of the turn. The
+        remedies are calibration (on a rate table) or estimating $s$ as an additional state when the vehicle rotates enough to make it observable.
+\end{solutions}

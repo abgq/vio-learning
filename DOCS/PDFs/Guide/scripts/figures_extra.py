@@ -897,11 +897,13 @@ def fig_pyramid():
     n = img.shape[0]
     for lvl, (ax, L) in enumerate(zip(axs, levels)):
         show(ax, L, f"level {lvl}: {L.shape[0]} px", vmin=0, vmax=1, extent=[0, n, n, 0])
-        x0, y0 = 30, 232
-        ax.annotate("", xy=(x0 + 24, y0), xytext=(x0, y0),
-                    arrowprops=dict(arrowstyle="-|>", color=ORANGE, lw=1.8, mutation_scale=8, shrinkA=0, shrinkB=0))
-        ax.text(x0 + 12, y0 - 14, f"{24 // 2 ** lvl} px", color=ORANGE, fontsize=7.5, ha="center",
-                bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.85))
+        # the same 24 px (level-0) displacement, drawn as a scale bar and labelled in this level's pixels
+        x0, y0 = 16, 238
+        ax.add_patch(plt.Rectangle((x0 - 6, y0 - 13), 80, 26, fc="white", ec="none", alpha=0.85))
+        ax.plot([x0, x0 + 24], [y0, y0], color=ORANGE, lw=2.2, solid_capstyle="butt")
+        for xe in (x0, x0 + 24):
+            ax.plot([xe, xe], [y0 - 7, y0 + 7], color=ORANGE, lw=1.2)
+        ax.text(x0 + 30, y0, f"{24 // 2 ** lvl} px", color=ORANGE, fontsize=7.5, ha="left", va="center")
     fig.tight_layout(pad=0.3)
     save(fig, "fig_pyramid.pdf")
 

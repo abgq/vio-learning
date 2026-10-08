@@ -1,0 +1,61 @@
+% Solutions to the exercises of Chapter 21.
+\begin{solutions}
+  \item The exponent splits, $e^{-(u^2 + v^2)/2\sigma^2} = e^{-u^2/2\sigma^2}e^{-v^2/2\sigma^2}$, and so does the constant, $\frac1{2\pi\sigma^2} = \frac1{\sqrt{2\pi}\sigma}\cdot\frac1{\sqrt{2\pi}\sigma}$, so
+        $G_\sigma(u, v) = g_\sigma(u)g_\sigma(v)$. Sampled on a square $k\times k$ grid the kernel is the outer product $h = gg\T$ of the sampled 1D kernel, and normalizing
+        each 1D kernel to unit sum normalizes the product too. Then
+        \[
+          (h * I)[u, v] = \sum_jg[j]\Big(\sum_ig[i]\,I[u - i, v - j]\Big):
+        \]
+        the inner sum filters every row with $g$ ($k$ multiplications per pixel) and the outer sum filters the columns of the result ($k$ more), $2k$ in total
+        instead of $k^2$. For $\sigma = 1.5$ truncated at $\pm3\sigma$ ($k = 11$) this is 22 instead of 121. Truncating to a \emph{disk} instead of a square would destroy
+        the factorization.
+
+  \item The kernel $[a_0, \dots, a_n]$ corresponds to the polynomial $\sum_ia_iz^i$, and convolution of kernels is multiplication of polynomials. Convolving
+        $\tfrac12[1, 1]$ with itself $n$ times gives $\big(\tfrac12(1 + z)\big)^n = 2^{-n}\sum_i\binom{n}{i}z^i$: the binomial kernels $\tfrac14[1, 2, 1]$, $\tfrac18[1, 3, 3, 1]$, $\tfrac1{16}[1, 4, 6, 4, 1]$, \dots.
+        A non-negative kernel with unit sum is a probability distribution, and the convolution of two distributions is the distribution of the sum of
+        independent variables, whose variances add (\cref{ch:prob}). The two-point kernel $\tfrac12[1, 1]$ has variance $\tfrac14$, so the $n$-fold kernel has variance $n/4$:
+        $\tfrac12$ for $[1, 2, 1]$, $1$ for $[1, 4, 6, 4, 1]$. By the central limit theorem the binomial kernels approach Gaussians with $\sigma = \sqrt n/2$; OpenCV's
+        \code{pyrDown} kernel is a Gaussian with $\sigma = 1$~px.
+
+  \item At pixel $(u, v)$ the correlation sums $S_u[j, i]\,c\,(u + i)$. In each row the weights $-1, 0, 1$ give $c(u + 1) - c(u - 1) = 2c$, and the three rows are
+        weighted $1, 2, 1$, so
+        \[
+          (S_u\star I)[u, v] = (1 + 2 + 1)\cdot2c = 8c,
+        \]
+        everywhere, for a true derivative $I_u = c$. The factor 8 is the product of the smoothing kernel's sum (4) and the distance between the differenced
+        pixels (2). Divide by 8 to obtain the gradient (by 32 for Scharr, whose smoothing kernel sums to 16). With convolution instead of correlation the
+        kernel is flipped and the response is $-8c$: check the sign convention of whatever library you use.
+
+  \item A zone plate $I = \tfrac12 + \tfrac12\cos(\pi r^2/n)$ on an $n\times n$ grid (the figure uses $n = 256$) has phase $\pi r^2/n$, hence local frequency $r/n$ cycles per pixel. After
+        keeping every fourth pixel the representable limit is $\tfrac18$ cycle per original pixel, so the true rings beyond $r = n/8 = 32$ cannot be represented
+        and should become uniform gray; instead, naive sub-sampling folds them into false rings, with new ``centers'' where the frequency is a multiple of the
+        new sampling rate $\tfrac14$. A Gaussian blur multiplies frequency $f$ by $e^{-2\pi^2\sigma^2f^2}$. Measuring the false pattern in the region $48 < r < 128$:
+        \begin{center}\small
+        \begin{tabular}{@{}l c c c c c@{}}
+        \toprule
+        blur $\sigma$ (px) & 0 & 1 & 1.5 & 2 & 3 \\
+        \midrule
+        RMS of false pattern & 0.353 & 0.061 & 0.018 & 0.005 & 0.002 \\
+        response at $f = \tfrac18$ (kept detail) & 1 & 0.73 & 0.50 & 0.29 & 0.06 \\
+        response at $f = \tfrac14$ (aliases to DC) & 1 & 0.29 & 0.06 & 0.007 & $10^{-5}$ \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        A blur of $\sigma \approx 2$~px, half the shrink factor, removes the aliasing (as in \cref{fig:aliasing-image}); much more also removes detail the smaller image could
+        have kept. The same rule, $\sigma \approx s/2$ for a shrink by $s$, gives \code{pyrDown}'s $\sigma = 1$ for $s = 2$.
+
+  \item Along the row $v_0$, linear interpolation gives $(1 - a)I_{00} + aI_{10}$, and along the row $v_0 + 1$, $(1 - a)I_{01} + aI_{11}$. Interpolating these linearly in $v$ with
+        weights $1 - b$ and $b$ gives the formula of \cref{sec:interpolation}. In the other order, the columns give $(1 - b)I_{00} + bI_{01}$ and $(1 - b)I_{10} + bI_{11}$, and
+        interpolating in $u$ gives $(1 - a)(1 - b)I_{00} + (1 - a)bI_{01} + a(1 - b)I_{10} + abI_{11}$, the same four products. Without expanding: both results have the form
+        $c_0 + c_1a + c_2b + c_3ab$ and take the four corner values at the corners, and those four conditions determine the four coefficients uniquely. The
+        interpolant is linear along every row and column but quadratic along diagonals, and its derivatives jump at pixel boundaries.
+
+  \item Fit $r(x) = Ax^2 + Bx + C$ through $(-1, r_{-1})$, $(0, r_0)$, $(1, r_1)$: $C = r_0$, $A + B + C = r_1$ and $A - B + C = r_{-1}$, so
+        $B = \tfrac12(r_1 - r_{-1})$ and $A = \tfrac12(r_{-1} - 2r_0 + r_1)$. The vertex is at
+        \[
+          \delta = -\frac{B}{2A} = \frac{r_{-1} - r_1}{2(r_{-1} - 2r_0 + r_1)} .
+        \]
+        If $r_0$ is the largest of the three, $A < 0$ (a maximum), and $|r_{-1} - r_1| \le (r_0 - r_{-1}) + (r_0 - r_1) = 2|A|$, so $|\delta| \le \tfrac12$: the refined peak stays within
+        the pixel. Real peaks are not parabolas, and the fit is biased toward the pixel center: for a Gaussian peak of width $\sigma = 1$~px at a true
+        offset of $0.3$~px it returns $0.25$, a bias of up to $0.05$~px, larger for sharper peaks.
+\end{solutions}

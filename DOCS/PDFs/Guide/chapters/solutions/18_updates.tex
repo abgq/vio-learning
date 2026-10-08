@@ -1,0 +1,58 @@
+% Solutions to the exercises of Chapter 18.
+\begin{solutions}
+  \item With $H = [\,I_3\ \ 0\ \ {-\hat R\sx{\ell_b}}\ \ 0\ \ 0\,]$ and the block-diagonal $P$, only the position and attitude blocks contribute:
+        \[
+          S = \sigma_p^2I + \sigma_\theta^2\hat R\sx{\ell_b}\sx{\ell_b}\T\hat R\T + \sigma^2I = \alpha\,I - \sigma_\theta^2\,(\hat R\ell_b)(\hat R\ell_b)\T,
+          \qquad \alpha = \sigma_p^2 + \sigma^2 + \sigma_\theta^2\|\ell_b\|^2,
+        \]
+        using $\sx{\ell}\sx{\ell}\T = -\sx{\ell}^2 = \|\ell\|^2I - \ell\ell\T$. The gain blocks are $K_p = \sigma_p^2S\inv$, $K_\theta = \sigma_\theta^2(-\hat R\sx{\ell_b})\T S\inv = \sigma_\theta^2\sx{\ell_b}\hat R\T S\inv$,
+        and zero for velocity and biases. Since $S\inv(\hat R\ell_b) \propto \hat R\ell_b$ and $\sx{\ell_b}\hat R\T\hat R\ell_b = 0$, the attitude gain simplifies to
+        \[
+          K_\theta = \frac{\sigma_\theta^2}{\sigma_p^2 + \sigma^2 + \sigma_\theta^2\|\ell_b\|^2}\,\sx{\ell_b}\hat R\T .
+        \]
+        Its range is the range of $\sx{\ell_b}$: the update corrects only the attitude components perpendicular to the lever arm, never the rotation
+        about $\ell_b$ itself, which does not move the antenna. Velocity and biases are not corrected here because this prior has no cross-covariances;
+        after some propagation they would be.
+
+  \item With $h(x) = \|p - b_w\|$ and $\hat\rho = \|\hat p - b_w\|$, perturbing $p = \hat p + \delta p$ gives $h \approx \hat\rho + u\T\delta p$ with $u = (\hat p - b_w)/\hat\rho$, so
+        \[
+          H = [\,u\T\ \ 0\ \ 0\ \ 0\ \ 0\,] \in \R^{1\times15} .
+        \]
+        Its nullspace is 14-dimensional: the two position directions perpendicular to the line of sight (moving on the sphere around the beacon), and
+        all velocity, attitude and bias errors. One range observes one number; position perpendicular to the line of sight becomes observable only
+        through several beacons or through motion and the correlations it builds.
+
+  \item Simulate a constant-velocity target (acceleration density $\sqrt{0.5}$, position measurements at 10~Hz with unit variance) and run the
+        filter with $Q$ divided by 100 and a $\chi^2_{0.95}(1)$ gate. Typical results, per 30-second window:
+        \begin{center}\small
+        \begin{tabular}{@{}l l l@{}}
+        \toprule
+        filter & rejection rate & RMS position error \\
+        \midrule
+        correct $Q$, gated & 2--8\% & 0.4--0.65~m \\
+        $Q/100$, gated & 79\%, then 100\% & 26, 126, 243, \dots, 3246~m \\
+        $Q/100$, not gated & 0\% & 0.8--1.7~m \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        The overconfident filter predicts innovations that are far too small, so good measurements fail the gate; each rejection removes the
+        correction the filter needed, the error grows, more measurements are rejected, and within half a minute the filter ignores all data and
+        dead-reckons. Its reported $\sigma$ (about 200~m at the end) stays far below its actual error. Without the gate the same mistuned filter is
+        merely suboptimal: its error stays bounded. A rejection rate far above the design value is the alarm signal (\cref{sec:gating}).
+
+  \item At rest, the accelerometer measures $\hat R\T(-g_w) + b_a$, and to first order a tilt error and a horizontal bias change this reading in the same way:
+        in the velocity error dynamics both enter through the horizontal specific-force error, so from accelerations alone only their combination is
+        observable (\cref{ch:strapdown}). With a pose sensor, the position measurements make the velocity error and its rate observable (two
+        differentiations, as in \cref{sec:observability-linear}), while the attitude measurement observes $\delta\theta$ directly. The rate of the velocity
+        error is (tilt term) $+$ (bias term); with the tilt term known from the attitude measurement, the bias term, and hence the horizontal bias, is
+        determined. The vertical bias was observable already (it changes the measured magnitude of gravity, which the position measurements expose),
+        and the gyro bias is observable from the drift of the attitude between measurements. With a pose sensor, every IMU state is observable,
+        which is why the covariances converge in Milestone 6.
+
+  \item For the optimal gain, $P_{\mathrm{prior}} - P_{\mathrm{post}} = KHP = KSK\T$ (\cref{thm:kf-update}), and $KSK\T \succeq 0$ because it is a congruence of $S \succ 0$
+        (\cref{prop:psd}). In floating point the simple update $P_{\mathrm{post}} = (I - KH)P$ is neither symmetric nor guaranteed PSD (Exercise 12.3), and
+        $P_{\mathrm{prior}} - P_{\mathrm{post}}$ then has rounding-level asymmetry and can have slightly negative eigenvalues, notably in directions the
+        measurement does not observe, where the true difference is exactly zero and the computed one is $\pm u\|P\|$. A test must therefore symmetrize the
+        difference and allow a tolerance: $\lambda_{\min}\big(\tfrac12(D + D\T)\big) \ge -c\,u\,\|P\|$ with a small constant $c$. Using the Joseph form and
+        symmetrizing after each update makes $P_{\mathrm{post}}$ itself PSD, but the difference still needs the tolerance.
+\end{solutions}

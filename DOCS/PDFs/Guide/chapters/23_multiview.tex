@@ -312,8 +312,7 @@ Features that fail are discarded, not fed to the update (AGENTS.md F5, Milestone
 \section{Bundle adjustment}
 \label{sec:bundle-adjustment}
 
-\index{bundle adjustment}
-\term{Bundle adjustment} estimates all camera poses and all 3D points at once by minimizing the total reprojection error,
+\termi{Bundle adjustment}{bundle adjustment} estimates all camera poses and all 3D points at once by minimizing the total reprojection error,
 \begin{equation}
   \min_{\{T_i\},\{p_j\}}\ \sum_{(i,j)\text{ observed}}\big\|z_{ij} - \pi\big(T_i\inv p_j\big)\big\|^2_{R\inv},
 \end{equation}
@@ -358,3 +357,4 @@ capability that odometry lacks.
   \item Derive \eqref{eq:depth-sigma}, reproduce \cref{fig:triangulation}, and repeat with three views over the same baseline.
   \item Count the gauge freedoms of monocular bundle adjustment and of visual-inertial bundle adjustment, and explain the difference.
 \end{exercises}
+\input{chapters/solutions/23_multiview}

@@ -1,0 +1,66 @@
+% Solutions to the exercises of Chapter 1.
+\begin{solutions}
+  \item With $b_a = 5~\mathrm{mg} = 4.905\times10^{-2}~\mathrm{m/s^2}$, the position error $\tfrac12b_at^2$ reaches 1~m at
+        \[
+          t = \sqrt{2/b_a} = 6.39~\mathrm{s}.
+        \]
+        A gyro bias produces $\tfrac16gb_gt^3$, which equals 1~m at the same time when
+        $b_g = 6/(gt^3) = 3b_a/(gt) = 2.35\times10^{-3}~\mathrm{rad/s}$, about $0.13~^\circ/\mathrm{s}$ or $480~^\circ/\mathrm{h}$.
+        The gyro term grows like $t^3$ and the accelerometer term like $t^2$, so for longer flights the gyro dominates: a
+        typical MEMS gyro bias of $10^{-3}$~rad/s overtakes the 5~mg accelerometer bias after $t = 3b_a/(gb_g) = 15$~s.
+
+  \item Let the vehicle be level and at rest, and let the estimate be tilted by $\delta\theta_0$ about the $x$-axis,
+        $\hat R = R_x(\delta\theta_0)$. The accelerometer measures the specific force $f = (0, 0, g)$, and the navigation
+        equations compute the acceleration
+        \[
+          \hat Rf + g_w = \big(0,\ -g\sin\delta\theta_0,\ g\cos\delta\theta_0\big) + (0, 0, -g)
+          = \big(0,\ -g\sin\delta\theta_0,\ -g(1 - \cos\delta\theta_0)\big).
+        \]
+        The horizontal part, of magnitude $g\sin\delta\theta_0 = g\,\delta\theta_0 + O(\delta\theta_0^3)$, is the gravity leak; the
+        vertical part $-g(1 - \cos\delta\theta_0) \approx -\tfrac12g\,\delta\theta_0^2$ is second order. (The exact magnitude of the
+        whole error vector is $2g\sin(\delta\theta_0/2)$.) The first-order formula overestimates the horizontal leak by the
+        factor $\delta\theta_0/\sin\delta\theta_0 \approx 1 + \delta\theta_0^2/6$, which reaches $1.01$ at
+        $\delta\theta_0 = 0.244~\mathrm{rad} \approx 14^\circ$. For the milliradian tilts of a working filter, $g\,\delta\theta$ is
+        essentially exact; it becomes inaccurate only for gross initialization errors.
+
+  \item A camera $i$ with pose $(R_i, p_i)$ sees the point $p_f$ at camera coordinates $R_i\T(p_f - p_i)$. After the common
+        transformation $R_i \mapsto RR_i$, $p_i \mapsto Rp_i + t$, $p_f \mapsto Rp_f + t$,
+        \[
+          (RR_i)\T\big(Rp_f + t - Rp_i - t\big) = R_i\T R\T R\,(p_f - p_i) = R_i\T(p_f - p_i),
+        \]
+        so every image is unchanged. Combined with \cref{prop:scale-ambiguity}, the images are invariant under every similarity
+        transformation $p \mapsto sRp + t$: a monocular camera has $3 + 3 + 1 = 7$ unobservable degrees of freedom (rotation,
+        translation and scale). An IMU removes three of them. The accelerometer measures acceleration in metric units, and
+        scaling the trajectory by $s$ scales its accelerations by $s$, so scale becomes observable whenever the body
+        accelerates. The accelerometer also measures the direction of gravity in the body frame, which a rotation about a
+        horizontal axis would change, so roll and pitch become observable. Rotations about the vertical and translations
+        change neither gravity nor any acceleration, so four unobservable directions remain: global position and yaw
+        (\cref{thm:vio-unobservable}).
+
+  \item During a perfect hover the true rate, velocity and acceleration are all zero. Consider what each sensor reports.
+        \begin{itemize}[leftmargin=1.2em]
+          \item The \emph{camera} sees identical images. The relative rotation between frames is observed to be zero, but
+                with no baseline there is no parallax: neither the depths of the features nor any translation can be
+                measured, because an unchanged image is also what a slowly translating camera sees in a distant scene.
+          \item The \emph{gyroscope} reads $b_g$ plus noise. Since the camera pins the true rotation to zero, the reading is
+                the bias: $b_g$ is estimable, exactly as in the static calibration of \cref{ch:strapdown}.
+          \item The \emph{accelerometer} reads $R_{wb}\T(-g_w) + b_a$. Its direction gives roll and pitch, but only up to the
+                horizontal bias: a horizontal $b_a$ is indistinguishable from a tilt of $\|b_a\|/g$, because without
+                rotation the bias and gravity never move relative to each other.
+        \end{itemize}
+        Hence the gyro bias, and roll and pitch combined with the horizontal accelerometer bias, can be estimated. What
+        cannot be distinguished: tilt from horizontal $b_a$; a velocity error, or a constant acceleration error such as the
+        vertical bias, from the true (zero) motion, since nothing measures translation and such errors integrate unseen;
+        the metric scale and the feature depths (no acceleration, no baseline); and, as always, global position and yaw.
+        This is the ``at rest'' row of the degenerate motions of \cref{ch:observability}. A real system detects the hover and
+        applies a zero-velocity update (\cref{ch:updates}): the pseudo-measurement $v = 0$ stops the velocity and position
+        drift and makes the vertical bias observable, while tilt and horizontal bias separate only once the vehicle
+        rotates.
+
+  \item A model answer: \emph{EKF-SLAM puts every observed feature into the state vector, so the cost of each update grows
+        quadratically with the number of features, which makes it impossible to use the hundreds of features visible in
+        every image in real time. The MSCKF instead keeps a sliding window of past camera poses in the state and turns each
+        feature track into constraints among all the poses that observed it, eliminating the feature position from the
+        linearized equations, so the cost becomes linear in the number of features while the geometric information of
+        each track is still used.}
+\end{solutions}

@@ -1,0 +1,68 @@
+% Solutions to the exercises of Chapter 22.
+\begin{solutions}
+  \item For a straight edge with unit normal $n$, every gradient in the window is parallel to $n$, $\nabla I = g(x)\,n$, so
+        \[
+          M = \Big(\sum_xw(x)g(x)^2\Big)\,nn\T,
+        \]
+        of rank one: eigenvalues $\lambda_1 = \sum_xwg^2$ and $\lambda_2 = 0$, with the null eigenvector along the edge. For a vertical step of height $h$ in a $15\times15$ uniform window with
+        central differences, each row has two pixels with $I_u = h/2$, so $M = \diag(7.5h^2, 0)$. For an ideal corner (a bright quadrant) with the window centered on
+        its tip, each edge covers half the window: $M = h^2\big[\begin{smallmatrix} 4 & 0.25 \\ 0.25 & 4\end{smallmatrix}\big]$ with eigenvalues $3.75h^2$ and $4.25h^2$, both large; the small
+        off-diagonal entry comes from the tip pixel, where both gradients are non-zero. More generally, two edges of equal strength $c$ with normals at an
+        angle $\alpha$ give $M = c(n_1n_1\T + n_2n_2\T)$ with eigenvalues $c(1 \pm \cos\alpha)$: a right-angle corner is ideal, while a sharp wedge (normals $20^\circ$ apart,
+        $\lambda_2 = 0.06c$) is poorly localized along its bisector.
+
+  \item The characteristic polynomial of $M = \big[\begin{smallmatrix} a & b \\ b & c\end{smallmatrix}\big]$ is $\lambda^2 - (\tr M)\lambda + \det M$, so $\lambda = \tfrac12\big(\tr M \pm \sqrt{(\tr M)^2 - 4\det M}\big)$.
+        The discriminant is
+        \[
+          (a + c)^2 - 4(ac - b^2) = (a - c)^2 + 4b^2 \ge 0,
+        \]
+        so both roots are real (as they must be for a symmetric matrix) and
+        $\lambda_{\min} = \tfrac12\big(a + c - \sqrt{(a - c)^2 + 4b^2}\big)$. Use the second form in code: $(\tr M)^2 - 4\det M$ subtracts two nearly equal numbers when the eigenvalues
+        are close, and rounding can make it slightly negative, which turns the square root into a NaN.
+
+  \item On a texture smoothed with $\sigma = 2$~px (as in \cref{fig:lk}) and a $21\times21$ window, the shift $(0.3, -0.7)$ gives errors of $0.76$, $0.022$ and $0.010$~px after
+        zero, one and two iterations, and then stalls at $0.010$~px. The floor is the bias of bilinear interpolation, since the shifted image was generated with
+        cubic interpolation. With cubic sampling the error keeps falling, as in the figure. For a shift of 8~px and a $15\times15$ window, single-level tracking is correct to
+        $0.1$~px from only 30--45\% of window positions: elsewhere it converges to a wrong local minimum. The texture decorrelates over a few pixels (the
+        autocorrelation is $0.58$ at 3~px and $0.26$ at 5~px), so the linearization holds only for displacements of about 2--3~px. With one pyramid level above the
+        base, the displacement there is 4~px and 93--98\% succeed; with two levels it is 2~px and all succeed. The rule: choose $L$ so that the largest expected
+        displacement divided by $2^L$ is within the texture's correlation length.
+
+  \item Let the true motion be $d$. The forward track returns $\hat d_f = d + e_f$ and the backward track, started at $x + \hat d_f$, returns $\hat d_b = -d + e_b$, where $e_f$ and $e_b$
+        are the estimation errors of the two tracks. The round-trip error is $\hat d_f + \hat d_b = e_f + e_b$: the true motion cancels exactly, whatever its size. For a track
+        that converged to the right minimum, only the causes of estimation error remain: image noise, interpolation and the convergence tolerance. Without them,
+        both tracks would be exact. Moreover, $e_b \approx -e_f$: the backward window is centered on $x + \hat d_f$, so both directions compare the same pixel pairs of
+        the same two images. In a simulation with noise of 1\% of the intensity range ($15\times15$ window), the forward tracking error has a median of $0.03$~px,
+        but the round-trip error only $0.001$~px (99th percentile $0.005$~px), and $10^{-4}$~px without noise. The check tests self-consistency, not accuracy. Failures are a different matter: when half of the window is occluded in the
+        second image, the median round-trip error is $1.7$~px, and 97\% exceed $0.1$~px. Real images add deformation, blur and brightness change, which
+        raise the errors of correct tracks, so a threshold of a few tenths of a pixel keeps a wide margin while catching most failures. Better still, set it
+        from a histogram of round-trip errors on a real sequence: correct tracks form a sharp peak near zero and failures a long tail.
+
+  \item A rotation by $\theta = 0.05$~rad about the camera's $y$-axis turns the optical axis toward $+x_c$, so $R_{c_2c_1} = R_y(\theta)\T$. The feature at the principal point has
+        bearing $(0, 0, 1)$, which becomes $R_y(\theta)\T(0, 0, 1)\T = (-\sin\theta, 0, \cos\theta)$, so
+        \[
+          u_2 = c_u - f_u\tan\theta = c_u - 22.95, \qquad v_2 = c_v :
+        \]
+        the feature moves 23~px to the left, the same as $KR_{c_2c_1}K\inv\tilde u_1$ gives. The prediction does not depend on depth; the neglected translation, 1~m/s
+        over 50~ms at 5~m depth for example, adds only $f_u\cdot0.05/5 \approx 4.6$~px, which LK recovers easily from the predicted start.
+
+  \item Divide the image into cells (for example $8\times6$ cells of $94\times80$~px for EuRoC). Compute the corner response once; then, for each cell below its quota,
+        take its strongest local maxima above the threshold, skipping candidates within the minimum distance of an existing track or an already chosen
+        corner (a mask with discs around them). Count the features per cell before detecting, so that only depleted cells receive new ones. To evaluate,
+        plot the corners with and without bucketing and report two numbers: the fraction of occupied cells and the eigenvalues of the covariance of the
+        feature bearings. Without bucketing, the strongest corners concentrate on the most textured objects, leaving large parts of the view empty. With
+        bucketing they cover the image, and the bearing covariance becomes nearly isotropic, which is what conditions the stacked Jacobian.
+
+  \item A pool of fixed capacity $F_{\max}$ (at least the per-cell quota times the number of cells, plus room for tracks that are lost but not yet processed):
+        \begin{itemize}
+          \item an array of $F_{\max}$ track slots, each with a 64-bit ID, a status (free, new, tracked, lost), a count, and a fixed array of \code{kMaxClones}
+                observations $\{$clone ID or timestamp, normalized $(x, y)\}$;
+          \item a stack of free slot indices, so allocation and release are $O(1)$, and parallel fixed-capacity arrays of the current pixel positions and slot
+                indices, which are what the LK call consumes;
+          \item IDs that increase monotonically and are never reused, so stale references are detectable.
+        \end{itemize}
+        The history cannot overflow: when the oldest clone of a track leaves the window, the track is consumed (AGENTS.md F5), and any continuation starts a new
+        history. If the pool is full, the simplest correct policy is to detect no new features until slots free up; the alternative is to evict the weakest
+        (shortest or lowest-score) tracks. Either way the event is counted and logged, and the capacity is sized so that it does not happen in normal
+        operation. Discarding a track loses information but never corrupts the estimate, unlike reusing one.
+\end{solutions}

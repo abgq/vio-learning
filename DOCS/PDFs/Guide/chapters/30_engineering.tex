@@ -120,8 +120,10 @@ once can exceed it (\cref{ch:cloning}).
 ``It shouldn't allocate'' is not evidence. The project overrides the global \code{operator new} in its tests to count allocations
 (\code{tests/support/alloc\_guard.hpp}), and wraps every core hot-path test with a guard that asserts a count of zero. In debug builds,
 \code{EIGEN\_RUNTIME\_NO\_MALLOC} together with \code{Eigen::internal::set\_is\_malloc\_allowed(false)} makes Eigen itself abort on any internal
-allocation and reports where it happened. The two mechanisms are complementary: the guard catches allocations anywhere, Eigen's flag
-pinpoints those inside Eigen.
+allocation and reports where it happened. Both mechanisms are needed, because they see different allocations. The guard sees everything that goes
+through \code{operator new}: \code{std::vector} growth, \code{std::string}, \code{std::function}, \code{std::make\_unique}. Eigen, however, obtains its heap memory
+directly from \code{std::malloc} through its own aligned allocator, so a dynamic \code{Eigen::MatrixXd} is invisible to the guard. Only Eigen's flag catches it,
+and only in the \code{debug-sanitize} preset, where the flag is defined.
 
 % ------------------------------------------------------------------------------
 \section{Eigen in brief}
@@ -148,7 +150,8 @@ forms (template arguments) let Eigen unroll small operations completely.
 \paragraph{Passing matrices and blocks to functions.} A parameter of type \code{const Eigen::Matrix3d\&} accepts only that exact type. To accept any
 matrix or block of compatible layout, use \code{Eigen::Ref<const Eigen::MatrixXd>} (read-only) or \code{Eigen::Ref<Eigen::MatrixXd>} (writable). A
 read-only \code{Ref} quietly makes a temporary copy when the argument's layout is incompatible, and for a dynamic type that copy allocates; a writable
-\code{Ref} refuses to compile instead. The allocation guard catches the quiet case.
+\code{Ref} refuses to compile instead. The quiet copy is an Eigen allocation, so \code{EIGEN\_RUNTIME\_NO\_MALLOC} catches it and the
+\code{operator new} guard does not.
 
 \paragraph{Wrapping existing memory.} \code{Eigen::Map<const Eigen::Vector3d> v(ptr)} views three doubles at \code{ptr} as a vector, without copying.
 It is the right tool for parsed buffers, and the wrong one for quaternions read from EuRoC: \code{Eigen::Map<Eigen::Quaterniond>} interprets memory as
@@ -169,17 +172,24 @@ only one triangle.
 \section{Eigen pitfalls}
 
 \paragraph{Expression templates and \code{auto}.} Eigen operations return lightweight \emph{expression} objects that are evaluated
-lazily when assigned to a matrix. Storing one with \code{auto} keeps references to its operands, which may be temporaries that no
-longer exist when the expression is finally evaluated.
+lazily, when they are assigned to a matrix. An expression holds the matrices it uses by reference and nested expressions by value. Storing one
+with \code{auto} therefore has two dangers. If a referenced matrix is a temporary (made by \code{.eval()}, or returned by value from a function),
+the reference dangles. And even if every operand still exists, the computation happens only at the later assignment, with whatever values
+the operands have then.
 
 \begin{lstlisting}
-auto bad = R * (a + b);             // expression refers to the temporary (a + b)
-Eigen::Vector3d x = bad;            // undefined behavior: the temporary is gone
-Eigen::Vector3d good = R * (a + b); // evaluated immediately into a concrete type
+auto bad = (a + b).eval().transpose(); // refers to the temporary made by eval()
+Eigen::RowVector3d x = bad;            // undefined behavior: that temporary is gone
+Eigen::RowVector3d good = (a + b).transpose(); // concrete type: evaluated now
+
+auto lazy = A * v;                     // nothing is computed here
+A(0, 0) = 10.0;
+Eigen::Vector3d y = lazy;              // computed now, with the modified A
 \end{lstlisting}
 
 The rule is simple: never use \code{auto} with Eigen expressions (AGENTS.md E5). Name the concrete type, or call \code{.eval()} when a
-temporary really is wanted. AddressSanitizer catches many of these bugs, but not all.
+temporary really is wanted. AddressSanitizer reports the dangling case (as a use after scope), but not the stale one, which reads only valid
+memory (Exercise~30.2).
 
 \paragraph{Aliasing.} Eigen assumes that the destination of a matrix product may alias its operands and evaluates products into a
 temporary. With dynamic sizes that temporary allocates. When the destination is known not to alias, \code{.noalias()} writes directly
@@ -199,8 +209,8 @@ with a workspace.
 \code{-march} or alignment-changing flags between translation units or with dependencies, which the project forbids.
 
 \paragraph{Decompositions without allocation.} Eigen's decompositions normally own their storage. Fixed-max decomposition objects held as
-members, or the in-place variants that factor a matrix in its own storage, avoid per-call allocation. Whatever the API, verify with the
-allocation guard.
+members, or the in-place variants that factor a matrix in its own storage, avoid per-call allocation. Whatever the API, verify with
+\code{EIGEN\_RUNTIME\_NO\_MALLOC}, which sees Eigen's allocations where the \code{operator new} guard cannot.
 
 % ------------------------------------------------------------------------------
 \section{Time and events}
@@ -331,7 +341,8 @@ datasets. Each extension adds states and Jacobians, and each Jacobian gets its d
 \begin{takeaways}
 \begin{itemize}
   \item Heap allocation has unpredictable cost; the stack is cheap but small. Large workspaces are members, created once.
-  \item Determinism requires zero allocation in the core: fixed-max-size matrices, member workspaces, proven by allocation guards.
+  \item Determinism requires zero allocation in the core: fixed-max-size matrices, member workspaces, proven by allocation guards and
+        \code{EIGEN\_RUNTIME\_NO\_MALLOC} (Eigen allocates with \code{malloc}, which the guard does not see).
   \item Never use \code{auto} with Eigen expressions; use \code{.noalias()} only when there is no aliasing.
   \item Keep time in integer nanoseconds and process one presorted event stream.
   \item Sanitizers turn undefined behavior into reports; without \code{-fno-sanitize-recover=all} UBSan reports do not fail tests.
@@ -354,4 +365,5 @@ datasets. Each extension adds states and Jacobians, and each Jacobian gets its d
         happens if the parameter is a writable \code{Ref}?
   \item Add a third alternative to the \code{SensorEvent} variant without handling it in the \code{Overloaded} visitor. Read the compiler error.
 \end{exercises}
+\input{chapters/solutions/30_engineering}
 \fussy

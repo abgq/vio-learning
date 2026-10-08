@@ -1,0 +1,52 @@
+% Solutions to the exercises of Chapter 19.
+\begin{solutions}
+  \item If the filter is consistent and its errors Gaussian, $\epsilon_k = e_k\T P_k\inv e_k \sim \chi^2_{15}$ (\cref{thm:mahalanobis-chi2}). The 95\% quantile $\chi^2_{0.95}(15) = 25.0$ is
+        by definition the value exceeded with probability 5\%, so a single run exceeds it at 5\% of its time steps. A single sample is a weak test:
+        its two-sided 95\% range is $[6.3, 27.5]$, a factor of more than four, and a filter whose covariance is too small by 30\% still produces values
+        inside it most of the time. Averaging over $N$ independent runs shrinks the spread: $N\bar\epsilon \sim \chi^2_{15N}$ has relative standard deviation
+        $\sqrt{2/(15N)}$, and for $N = 50$ the interval is $[13.5, 16.6]$, about $\pm10\%$. A 30\% error now moves the average far outside it.
+
+  \item In a simulation of the same kind as \cref{fig:nees} ($q = r = 1$, 50 runs of 200 steps), the average NEES ($n = 2$) and NIS ($m = 1$) after the
+        transient are:
+        \begin{center}\small
+        \begin{tabular}{@{}l c c@{}}
+        \toprule
+        filter & NEES (band $[1.48, 2.59]$) & NIS (band $[0.65, 1.43]$) \\
+        \midrule
+        consistent & 1.9 & 1.00 \\
+        $Q/20$ & 20.0 & 1.5 \\
+        $20\,Q$ & 1.1 & 0.87 \\
+        $R/20$ & 21.7 & 17.5 \\
+        $20\,R$ & 1.0 & 0.08 \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        Both kinds of error make the filter over- or underconfident in the NEES, but the NIS separates them. A wrong measurement noise enters $S$
+        directly, so the NIS is wildly off ($17.5$ and $0.08$). A wrong process noise affects $S$ only through $HP^-H\T$, which the measurement noise partly
+        masks, so the NIS moves much less ($1.5$ and $0.87$, the latter inside the band). Rule of thumb: NIS problems point at $R$ (or at outliers and
+        wrong measurement models), NEES problems with a healthy NIS point at $Q$ or at unobservable directions (\cref{tab:consistency-diagnosis}).
+
+  \item With centered points $a_i = (x_i, y_i, z_i)$ (truth) and $b_i = (\hat x_i, \hat y_i, \hat z_i)$ (estimate),
+        \[
+          \sum_ia_i\T R_z(\psi)b_i = \cos\psi\underbrace{\sum_i(x_i\hat x_i + y_i\hat y_i)}_{A} + \sin\psi\underbrace{\sum_i(y_i\hat x_i - x_i\hat y_i)}_{B} + \sum_iz_i\hat z_i .
+        \]
+        As a function of $\psi$ this is $\sqrt{A^2 + B^2}\cos(\psi - \psi_0) + \text{const}$ with $(\cos\psi_0, \sin\psi_0) \propto (A, B)$, so it is maximized at
+        $\psi^\star = \atantwo(B, A)$, which is \eqref{eq:4dof-yaw}. (Setting the derivative $-A\sin\psi + B\cos\psi$
+        to zero gives $\tan\psi = B/A$, which has two solutions; the $\atantwo$ picks the maximum rather than the minimum.) The translation follows
+        as before: $t^\star = \mu - R_z(\psi^\star)\hat\mu$, which maps centroid onto centroid.
+
+  \item The standard EKF linearizes at estimates that change over time, which makes the global yaw appear observable in its linearized model
+        (\cref{ch:observability}). The filter then extracts spurious yaw information from measurements that contain none: its yaw variance shrinks,
+        or grows more slowly than the true yaw error, which in VIO drifts like a random walk because nothing measures it. The NEES of yaw,
+        $e_\psi^2/\sigma_\psi^2$, therefore grows steadily. The NIS stays healthy because innovations depend only on observable quantities (relative motion,
+        roll, pitch, scale): an error along an unobservable direction changes no predicted measurement, so it cannot show up in the residuals
+        (\cref{tab:consistency-diagnosis}, ``high, growing / normal'').
+
+  \item A yaw drift of $1^\circ$ per minute is $\omega_d = 2.9\times10^{-4}$~rad/s. A 10~m segment takes 10~s at 1~m/s, during which the heading drifts by
+        $0.167^\circ$: that is the rotational RPE. The translational RPE is the lateral offset accumulated within the segment, about
+        $\tfrac12\omega_dv\,\Delta t^2 = 1.5$~cm (a simulation gives $1.4$~cm), i.e.\ $0.15\%$ of the distance travelled, and it is the same for every segment of the
+        flight. For a straight 10-minute flight, by contrast, the estimated path bends into an arc of radius $v/\omega_d = 3.4$~km: the final position error is
+        $\tfrac12\omega_dvT^2 = 52$~m, the RMS error without alignment 23~m, and after the best rigid alignment still $3.9$~m. The ATE grows quadratically
+        with the duration and depends on the trajectory and on the alignment; the RPE does not grow and measures the drift rate itself, which is why
+        odometry is compared with RPE and full trajectories with ATE.
+\end{solutions}

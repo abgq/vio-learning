@@ -1,0 +1,71 @@
+% Solutions to the exercises of Chapter 9.
+\begin{solutions}
+  \item The model is $z_i = x + n_i$, i.e.\ $H = \mathbf 1$ (a column of ones) and $R = \diag(\sigma_i^2)$. The WLS estimate is the BLUE
+        (\cref{thm:gauss-markov}):
+        \[
+          \hat x = \big(\mathbf 1\T R\inv\mathbf 1\big)\inv\mathbf 1\T R\inv z = \frac{\sum_iz_i/\sigma_i^2}{\sum_i1/\sigma_i^2},
+          \qquad \Var(\hat x) = \Big(\sum_i\frac{1}{\sigma_i^2}\Big)\inv,
+        \]
+        the inverse-variance weighted mean. The sample mean $\bar z = \frac1m\sum_iz_i$ is linear and unbiased with variance $\frac{1}{m^2}\sum_i\sigma_i^2$, and by the
+        Cauchy--Schwarz inequality $\big(\sum_i\sigma_i^2\big)\big(\sum_i\sigma_i^{-2}\big) \ge m^2$, with equality only when all $\sigma_i$ are equal. So
+        $\Var(\bar z) \ge \Var(\hat x)$, strictly unless the variances are equal: then (and only then) the two estimators coincide. One poor sensor can
+        ruin a plain average; in the weighted one it simply counts for little.
+
+  \item With $z_i = p_0 + vt_i + n_i$, $H$ has rows $(1, t_i)$ and $\Cov(\hat p_0, \hat v) = (H\T H)\inv$. For $t = -5, \dots, 5$, $\sum t_i = 0$ and $\sum t_i^2 = 110$, so
+        \[
+          (H\T H)\inv = \begin{bmatrix}11 & 0\\ 0 & 110\end{bmatrix}\inv = \diag\big(0.0909,\ 0.00909\big):
+        \]
+        $\sigma_{p_0} = 0.30$, $\sigma_v = 0.095$, uncorrelated. For $t = 0, \dots, 10$, $\sum t_i = 55$ and $\sum t_i^2 = 385$, and
+        \[
+          (H\T H)\inv = \frac{1}{1210}\begin{bmatrix}385 & -55\\ -55 & 11\end{bmatrix} = \begin{bmatrix}0.318 & -0.0455\\ -0.0455 & 0.00909\end{bmatrix}.
+        \]
+        The velocity variance is unchanged (it depends only on the spread of the times), but $p_0$ is now the value at the \emph{end} of the data,
+        an extrapolation, with variance $3.5$ times larger and correlation $-0.85$ with $v$: a line that is too steep must start too low to pass
+        through the data. The intercept is best determined at the centroid of the times, where the correlation vanishes.
+
+  \item For $z = Hx + n$ with $n \sim \N(0, R)$, $\log p(z\mid x) = -\tfrac12(z - Hx)\T R\inv(z - Hx) + \text{const}$. Its gradient is
+        $\nabla_x\log p = H\T R\inv(z - Hx)$ and its Hessian $\nabla_x^2\log p = -H\T R\inv H$, which does not depend on $z$, so
+        $\mathcal I(x) = -\E[\nabla_x^2\log p] = H\T R\inv H$. (The outer-product definition agrees: $\E[H\T R\inv nn\T R\inv H] = H\T R\inv H$.) The matrix bound is
+        proved like the scalar one: for an unbiased $\hat x$ and the score $s = \nabla_x\log p$, differentiating $\E[\hat x] = x$ gives $\Cov(\hat x, s) = I$, and
+        the covariance matrix of $(\hat x, s)$,
+        $\begin{bmatrix}\Cov(\hat x) & I\\ I & \mathcal I\end{bmatrix} \succeq 0$, has the PSD Schur complement $\Cov(\hat x) - \mathcal I\inv \succeq 0$ (Exercise 3.3's argument).
+        WLS has covariance $(H\T R\inv H)\inv = \mathcal I\inv$ and attains the bound.
+
+  \item Apply \cref{thm:woodbury} (as in Exercise 3.6) to the covariance of \eqref{eq:bayes-linear}:
+        $(P\inv + H\T R\inv H)\inv = P - PH\T(HPH\T + R)\inv HP = P - KHP$ with $K = PH\T(HPH\T + R)\inv$, the covariance of \eqref{eq:lmmse-update}. For the mean,
+        multiply out with this expression:
+        \[
+          (P - KHP)\big(P\inv\mu + H\T R\inv z\big) = \mu - KH\mu + \big(PH\T - KHPH\T\big)R\inv z .
+        \]
+        Since $K(HPH\T + R) = PH\T$, we have $PH\T - KHPH\T = KR$, so the last term is $Kz$, and the mean is $\mu + K(z - H\mu)$: the two forms agree.
+
+  \item With prior $(\hat x_0, P_0)$, the batch estimate after $k$ measurements has information $P_k\inv = P_0\inv + \sum_{i\le k}H_i\T R_i\inv H_i$ and information
+        vector $P_k\inv\hat x_k = P_0\inv\hat x_0 + \sum_{i\le k}H_i\T R_i\inv z_i$. Subtracting the expressions for $k - 1$ gives the recursion in information form
+        stated in the chapter. Solving it for $\hat x_k$: $\hat x_k = P_k\big(P_{k-1}\inv\hat x_{k-1} + H_k\T R_k\inv z_k\big)$, and with
+        $P_{k-1}\inv = P_k\inv - H_k\T R_k\inv H_k$ this is $\hat x_k = \hat x_{k-1} + P_kH_k\T R_k\inv(z_k - H_k\hat x_{k-1})$. Finally $P_kH_k\T R_k\inv = K_k$ (the
+        push-through identity of Exercise 5.6) and $P_k = (I - K_kH_k)P_{k-1}$ by Woodbury. A numerical check with three unknowns, thirty scalar
+        measurements of random variances and a weak prior: the RLS estimate and covariance agree with the batch solution after every
+        measurement to $3\times10^{-12}$.
+
+  \item The LMMSE estimate uses only second moments: with $\E[x] = \E[z] = 0$, $\Sigma_{xz} = \E[x^4] = \tfrac15$ and $\Sigma_{zz} = \E[x^6] + \sigma^2 = \tfrac17 + \sigma^2$,
+        \[
+          \hat x_{\mathrm{LMMSE}} = \frac{1/5}{1/7 + \sigma^2}\,z \approx 1.4\,z ,
+        \]
+        a straight line through a cube-root-shaped relation. The conditional mean $\E[x\mid z]$ follows the cube root, $\approx z^{1/3}$ wherever the noise is
+        small compared with $z$. At $x = 0.5$ ($z = 0.125$) the LMMSE estimate is $0.17$, at $x = 0.9$ ($z = 0.73$) it is $1.02$, outside the support of $x$;
+        the conditional mean gives $0.50$ and $0.90$. Overall, for $\sigma = 0.01$, the LMMSE root-mean-square error is $0.23$ against $0.075$ for the
+        conditional mean (computed numerically). LMMSE does poorly because the dependence of $z$ on $x$ is strongly nonlinear: the best straight line
+        fits neither small nor large values. This is the limitation the EKF inherits, mitigated by linearizing locally around the current estimate
+        rather than globally.
+
+  \item With $z = Hx + n + \beta$, the estimate $\hat x = Lz$ with $L = (H\T R\inv H)\inv H\T R\inv$ satisfies $LH = I$, so
+        \[
+          \hat x - x = Ln + L\beta, \qquad \E[\hat x] - x = (H\T R\inv H)\inv H\T R\inv\beta .
+        \]
+        The noise term has zero mean and covariance $(H\T R\inv H)\inv$, which shrinks as measurements accumulate ($\propto 1/m$ for $m$ comparable measurements).
+        The bias term does not shrink: a constant offset in every measurement is averaged, not cancelled. The estimate therefore converges,
+        with ever-smaller reported covariance, to the wrong value, and the filter becomes overconfident. Large noise is honest: it is in $R$, so it
+        makes the covariance large. An unmodeled bias is invisible to the covariance and, if $\beta$ lies in the range of $H$, invisible in the residuals
+        too, because it is indistinguishable from a different $x$. The cure is to model the bias as a state (\cref{ch:processes}), which is exactly
+        why IMU biases are part of the filter state.
+\end{solutions}

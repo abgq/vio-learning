@@ -1,0 +1,69 @@
+% Solutions to the exercises of Chapter 26.
+\begin{solutions}
+  \item Take random $H_x \in \R^{8\times39}$, $H_f \in \R^{8\times3}$, an SPD prior $P$ and $\sigma^2 = 0.3$. Update once with $(A\T r, A\T H_x, \sigma^2I_5)$, and once the augmented state
+        $(\delta x, \delta p_f)$ with prior $\blkdiag(P, \lambda I_3)$ and $(r, [H_x\ H_f], \sigma^2I_8)$. The $\delta x$ blocks of the two posteriors differ by
+        \begin{center}\small
+        \begin{tabular}{@{}l c c c c@{}}
+        \toprule
+        $\lambda$ & $10^2$ & $10^4$ & $10^6$ & $10^8$ \\
+        \midrule
+        $\max|\Delta P|$ & $5\times10^{-2}$ & $6\times10^{-4}$ & $6\times10^{-6}$ & $6\times10^{-8}$ \\
+        $\max|\Delta\delta\hat x|$ & $10^{-2}$ & $10^{-4}$ & $10^{-6}$ & $10^{-8}$ \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        The difference falls like $1/\lambda$, so in the limit of no prior the two updates coincide, as \cref{thm:nullspace-optimal} states. Beyond $\lambda \approx 10^{10}$ the
+        augmented computation itself loses accuracy, through cancellation in $\lambda - \lambda(\cdots)$. This is one more reason to eliminate the feature algebraically.
+
+  \item With $Q = [Q_1\ \ A]$ from the QR decomposition of $H_f$, the first three rotated equations are
+        \[
+          Q_1\T r = Q_1\T H_x\,\delta x + R_f\,\delta p_f + Q_1\T n, \qquad R_f = Q_1\T H_f \ \text{(upper triangular, invertible)}.
+        \]
+        For any $\delta x$, they can be satisfied exactly by one $\delta p_f$, which is why they carry no information about $\delta x$. Once the update has produced $\delta\hat x$, they
+        determine the feature correction:
+        \[
+          \delta\hat p_f = R_f\inv Q_1\T\big(r - H_x\,\delta\hat x\big), \qquad \hat p_f \gets \hat p_f + \delta\hat p_f .
+        \]
+        The noise $Q_1\T n$ is independent of $A\T n$, which drove the update, so the covariance follows directly:
+        $P_{ff} = R_f\inv\big(Q_1\T H_xP^+H_x\T Q_1 + \sigma^2I\big)R_f\mT$ and $P_{fx} = -R_f\inv Q_1\T H_xP^+$. Numerically, these agree with the augmented update of Exercise~1 to within $10^{-7}$ (Joseph
+        form). This is the back-substitution step of a Schur-complement solver (\cref{sec:schur-ba}). It is what a hybrid filter would do to promote a long-lived
+        feature into the state as a landmark, with exactly these covariance blocks.
+
+  \item For two views, $H_f$ is $4\times3$ of rank 3 and its left nullspace is one-dimensional, so $A_j$ is a single unit vector. It can be found without the Jacobian. Let
+        $\epsilon(z_1, z_2) = \bar x_2\T E\bar x_1$ be the epipolar function of the two clones' estimated relative pose. For any feature position, its two predicted images satisfy the epipolar
+        constraint, so $\epsilon\big(\pi_1(p_f), \pi_2(p_f)\big) \equiv 0$. Differentiating with respect to $p_f$ gives $g\T H_f = 0$ with
+        \[
+          g = \frac{\partial\epsilon}{\partial(z_1, z_2)} = \big((E\T\bar x_2)_1,\ (E\T\bar x_2)_2,\ (E\bar x_1)_1,\ (E\bar x_1)_2\big), \qquad A_j = g/\|g\| .
+        \]
+        The projected residual $r_o = g\T r/\|g\|$ is the first-order change of the epipolar residual divided by the norm of its gradient, which is the signed Sampson distance of
+        \cref{ch:multiview}. It measures how far the two observations are from satisfying the coplanarity of the two rays and the baseline, and nothing else.
+        Errors along the epipolar lines are absorbed by the feature position. For the worked example ($R = I$, $t = (-b, 0, 0)$, $\bar x_1 = (0, 0, 1)$), $g = (0, -b, 0, b)$, which gives
+        $A_j = (0, 1, 0, -1)/\sqrt2$ up to sign, as found there. A numerical check at a random configuration, with $H_f$ obtained by finite differences, gives
+        $|g\T H_f|/(\|g\|\|H_f\|) = 6\times10^{-11}$.
+
+  \item Applying the three reflections of \cref{alg:nullspace-householder} to $[H_f\ |\ H_x\ |\ r]$ with $m = 2M$ rows and $k = 6M$ clone columns costs about $4(k + 1)(3m - 3)$ flops. Forming
+        $A$ from a full QR and multiplying costs about $12m^2$ to build $Q$ plus $2(m - 3)m(k + 1)$ for $A\T[H_x\ r]$:
+        \begin{center}\small
+        \begin{tabular}{@{}l c c c@{}}
+        \toprule
+        & $M = 3$ & $M = 6$ & $M = 10$ \\
+        \midrule
+        Householder in place & 1.1~kflop & 4.9~kflop & 14~kflop \\
+        explicit $A$ & 1.1~kflop & 9.7~kflop & 46~kflop \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        The reflections cost $\mathcal{O}(M^2)$ against $\mathcal{O}(M^3)$, and they need no $m\times m$ workspace. The results agree to $10^{-15}$ up to the sign of each row. A different
+        orthonormal basis of the nullspace (from an SVD, say) gives a different $H_o$, but the same $H_o\T H_o$, the same $H_o\T r_o$ and the same gating statistic (checked to all
+        digits), because two bases differ by an orthogonal $U$: $A' = AU$.
+
+  \item For features $j \ne k$, $\Cov(n_{o,j}, n_{o,k}) = A_j\T\Cov(n_j, n_k)A_k = 0$ when the raw noises are independent, and $\Cov(n_{o,j}) = \sigma^2A_j\T A_j = \sigma^2I$. The projected
+        noises are jointly Gaussian (linear functions of Gaussian noise) and uncorrelated, hence independent, so the stacked noise covariance is $\sigma^2I_d$. The
+        projected \emph{residuals} are correlated nevertheless:
+        \[
+          \Cov(r_{o,j}, r_{o,k}) = H_{o,j}PH_{o,k}\T \ne 0,
+        \]
+        because every residual depends on the same uncertain state, here on clones that the two features share. These are the off-diagonal blocks of $S = H_oPH_o\T + \sigma^2I$,
+        and the stacked update accounts for them exactly. The measurement-noise matrix must not contain them: they are already in $P$, and adding them to $R$
+        would count the state uncertainty twice.
+\end{solutions}

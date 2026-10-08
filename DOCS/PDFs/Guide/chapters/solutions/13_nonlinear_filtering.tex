@@ -1,0 +1,63 @@
+% Solutions to the exercises of Chapter 13.
+\begin{solutions}
+  \item State $x = (p_x, p_y, \psi)$, inputs $(v, \omega)$ with noise $(n_v, n_\omega)$, beacon at $b = (b_x, b_y)$ with known position.
+        \begin{itemize}[leftmargin=1.2em]
+          \item \emph{Prediction}: $f(x) = \big(p_x + v\Dt\cos\psi,\ p_y + v\Dt\sin\psi,\ \psi + \omega\Dt\big)$, with Jacobians
+                \[
+                  F = \begin{bmatrix}1 & 0 & -v\Dt\sin\hat\psi\\ 0 & 1 & v\Dt\cos\hat\psi\\ 0 & 0 & 1\end{bmatrix}, \qquad
+                  L = \begin{bmatrix}\Dt\cos\hat\psi & 0\\ \Dt\sin\hat\psi & 0\\ 0 & \Dt\end{bmatrix},
+                \]
+                and $P^- = FPF\T + L\diag(\sigma_v^2, \sigma_\omega^2)L\T$.
+          \item \emph{Update}: $h(x) = \rho = \|p - b\|$, $H = \big[(\hat p_x - b_x)/\hat\rho,\ (\hat p_y - b_y)/\hat\rho,\ 0\big]$, then the standard update.
+        \end{itemize}
+        Linearization error enters in three places. (i) In the prediction through $\cos\psi$ and $\sin\psi$: with a large heading uncertainty the predicted
+        positions spread along an arc, the banana of \cref{fig:banana}, which $FPF\T$ approximates by an ellipse. (ii) In the update through the curvature of the
+        range: $\nabla^2h$ has the eigenvalue $1/\rho$ in the direction perpendicular to the line of sight, so the neglected second-order term is about
+        $\sigma_\perp^2/(2\rho)$, harmless far from the beacon and large close to it (and $H$ is undefined at $\rho = 0$). (iii) In the heading: the range does not
+        depend on $\psi$ ($H_\psi = 0$), so the heading is corrected only through the position-heading correlation that motion builds in $P$, which is
+        itself a linearized quantity. When the heading error is large, those correlations are wrong and the corrections are too.
+
+  \item With the figure's $\sigma_r = 0.02$, the true distribution of $(x, y) = (r\cos\phi, r\sin\phi)$ for $\phi \sim \N(\pi/2, \sigma_\phi^2)$ has mean $(0, e^{-\sigma_\phi^2/2})$ and
+        $\Var(y) = (1 + \sigma_r^2)(1 + e^{-2\sigma_\phi^2})/2 - e^{-\sigma_\phi^2}$, while linearization predicts the mean $(0, 1)$. The covariance is diagonal by symmetry,
+        so the Mahalanobis distance of the linearized mean is $d = (1 - e^{-\sigma_\phi^2/2})/\sqrt{\Var(y)}$:
+        \begin{center}\small
+        \begin{tabular}{@{}l c c c c c c@{}}
+        \toprule
+        $\sigma_\phi$ & $15^\circ$ & $30^\circ$ & $45^\circ$ & $60^\circ$ & $75^\circ$ & $90^\circ$ \\
+        \midrule
+        $d$ & 0.67 & 0.75 & 0.81 & 0.90 & 0.99 & 1.10 \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        The linearized mean leaves the $1\sigma$ ellipse at $\sigma_\phi \approx 76^\circ$ (confirmed by Monte Carlo). Notice that it never gets very far: in the
+        small-angle regime $d^2 \approx (\sigma_\phi^4/4)/(\sigma_r^2 + \sigma_\phi^4/2) < \tfrac12$, because the true distribution spreads along the arc as fast as its mean moves
+        inward. The more telling failure is the shape: the true distribution is a thin curved arc, and the linearized ellipse puts most of its
+        probability where the true one has none.
+
+  \item For $f(x) = Ax + b$ the transformed sigma points are $y_0 = A\mu + b$ and $y_{i}, y_{n+i} = A\mu + b \pm\sqrt{n + \lambda}\,A\ell_i$. The mean weights sum to
+        one ($\frac{\lambda}{n + \lambda} + \frac{2n}{2(n + \lambda)} = 1$) and the $\pm$ pairs cancel, so $\bar y = \sum_iW_i^{(m)}y_i = A\mu + b$. In the covariance the central point
+        contributes nothing ($y_0 - \bar y = 0$, so the value of $W_0^{(c)}$ and of $\beta$ is irrelevant), and each pair contributes
+        $2\cdot\frac{1}{2(n + \lambda)}(n + \lambda)A\ell_i\ell_i\T A\T$:
+        \[
+          \sum_iW_i^{(c)}(y_i - \bar y)(y_i - \bar y)\T = A\Big(\sum_{i=1}^n\ell_i\ell_i\T\Big)A\T = ALL\T A\T = APA\T .
+        \]
+        The unscented transform is exact for linear functions, as it must be to be consistent with the Kalman filter.
+
+  \item With $n = 1$, $\kappa = 2$ and $\alpha = 1$: $\lambda = 1\cdot3 - 1 = 2$, $n + \lambda = 3$, sigma points $\mu$ and $\mu \pm \sqrt3\,\sigma$, weights $W_0^{(m)} = \tfrac23$ and
+        $W_{1,2}^{(m)} = \tfrac16$. For $f(x) = x^2$,
+        \[
+          \tfrac23\mu^2 + \tfrac16\big((\mu + \sqrt3\sigma)^2 + (\mu - \sqrt3\sigma)^2\big) = \tfrac23\mu^2 + \tfrac16\big(2\mu^2 + 6\sigma^2\big) = \mu^2 + \sigma^2 = \E[x^2],
+        \]
+        exactly, whereas linearization gives $\mu^2$. (The choice $\kappa = 3 - n$ also makes the sigma points reproduce the fourth moment $3\sigma^4$ of a scalar
+        Gaussian: $\tfrac16\cdot2\cdot9\sigma^4 = 3\sigma^4$.)
+
+  \item A simple model that produces bimodality: landmarks at $0$ and $10$ on a line, and a sensor that reports the range to the \emph{nearest} landmark
+        without saying which one it is ($z = \min(|x|, |x - 10|) + n$, $\sigma_z = 0.1$). The robot starts at $x = 2$ with a uniform prior on $[0, 10]$ and
+        then moves right by $0.5$ per step (odometry noise $0.05$). A bootstrap particle filter with 2000 particles: propagate each particle with the
+        odometry plus sampled noise, multiply its weight by the likelihood $\exp(-(z - h(x_i))^2/2\sigma_z^2)$, normalize, and resample when the effective
+        sample size $1/\sum_iw_i^2$ drops below $N/2$. After the first measurement ($z = 1.87$) the posterior has two equal modes, near $1.9$ and near $8.1$
+        (weights $0.52$ and $0.48$), symmetric about $5$; its mean, $4.9$, is a place where the robot certainly is not, which is what a Gaussian filter
+        would report. After the first move the mirror hypothesis predicts a range of about $1.4$ (it approaches the landmark at 10) while the
+        measurement says $2.3$; its weight drops to zero and the filter tracks the true position from then on. A Kalman-type filter cannot represent
+        the bimodal stage at all: it would either lock onto one mode, possibly the wrong one, or average them.
+\end{solutions}

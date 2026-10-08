@@ -278,12 +278,11 @@ per axis. The initial pose estimate has \SI{0.1}{m} position and
 \begin{itemize}
   \item the \emph{standard EKF} uses the latest estimates, \eqref{eq:slam-phi}--\eqref{eq:slam-H};
   \item the \emph{FEJ-EKF} follows \cref{prop:fej};
-  \item the \emph{ideal EKF} evaluates every Jacobian at the true state. It is not realizable, but it is the benchmark for consistency, since its
+  \item the \emph{ideal EKF} evaluates every Jacobian at the true state, including the landmark-initialization Jacobian. It is not realizable, but it is the benchmark for consistency, since its
         linearized model has the true nullspace.
 \end{itemize}
-The heading panel makes the failure concrete. The initial heading error is unobservable, so no realizable filter can reduce it: the RMS heading
-error of the standard and FEJ filters stays near its initial value of about \SI{2.9}{\degree}. (The ideal EKF reduces it slightly, to \SI{2.5}{\degree}, because
-its Jacobians are evaluated at the true state, which leaks information that no real filter has.) The FEJ and ideal filters report standard
+The heading panel makes the failure concrete. The initial heading error is unobservable, so no filter can reduce it: the RMS heading
+error of all three filters stays near its initial value of about \SI{2.9}{\degree}. The FEJ and ideal filters report standard
 deviations that match their errors. The standard EKF reports a standard deviation that shrinks steadily, fastest at the loop closure, until its
 variance is less than 40\% of its actual mean squared error. It has ``learned'' the global heading from relative measurements, which is impossible. Its NEES grows accordingly, and nothing in its
 innovations reveals the problem.
@@ -456,3 +455,4 @@ information and stops drift, which is why many systems detect stillness explicit
   \item Read~\cite{li2013msckf2} and list which Jacobians must be evaluated at first estimates in the MSCKF. Sketch how you would store
         the first estimates in the project's data structures without allocation.
 \end{exercises}
+\input{chapters/solutions/29_observability}

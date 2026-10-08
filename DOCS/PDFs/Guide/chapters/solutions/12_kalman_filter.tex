@@ -1,0 +1,78 @@
+% Solutions to the exercises of Chapter 12.
+\begin{solutions}
+  \item Let the prior be $(\hat x, P)$ and the measurements $z_i = x + n_i$ with variances $R_i$. \emph{Sequentially}: the first update gives
+        $K_1 = P/(P + R_1)$, $\hat x_1 = \hat x + K_1(z_1 - \hat x)$ and $P_1 = PR_1/(P + R_1)$, i.e.\ $P_1\inv = P\inv + R_1\inv$ and $P_1\inv\hat x_1 = P\inv\hat x + R_1\inv z_1$; the second
+        adds $R_2\inv$ and $R_2\inv z_2$ in the same way:
+        \[
+          P_2\inv = P\inv + R_1\inv + R_2\inv, \qquad \hat x_2 = P_2\big(P\inv\hat x + R_1\inv z_1 + R_2\inv z_2\big).
+        \]
+        \emph{Stacked}: $H = (1, 1)\T$ and $R = \diag(R_1, R_2)$. Then $S = \begin{bmatrix}P + R_1 & P\\ P & P + R_2\end{bmatrix}$ with $\det S = P(R_1 + R_2) + R_1R_2$, and
+        $K = P(1, 1)S\inv = \frac{P}{\det S}(R_2, R_1)$. Hence $P^+ = P - KHP = P - \frac{P^2(R_1 + R_2)}{\det S} = \frac{PR_1R_2}{\det S}$, whose inverse is $P\inv + R_1\inv + R_2\inv$, and
+        \[
+          \hat x^+ = \hat x + \frac{P}{\det S}\big(R_2(z_1 - \hat x) + R_1(z_2 - \hat x)\big),
+        \]
+        which, multiplied out, equals $\hat x_2$. Both routes give the same posterior, as the sequential-processing proposition states.
+
+  \item By \eqref{eq:kf-update}, $P^- - P^+ = KSK\T$, which is PSD because $S \succ 0$ (it is a congruence of $S$); so $P^+ \preceq P^-$. For an arbitrary gain, write
+        $K = K_\star + D$ with $K_\star$ optimal. Expanding the Joseph form and using $K_\star S = P^-H\T$,
+        \[
+          P^+(K) = (I - KH)P^-(I - KH)\T + KRK\T = P^+(K_\star) + DSD\T .
+        \]
+        The optimal gain therefore minimizes the posterior covariance, but a poor gain can make it \emph{larger} than the prior: for $P^- = H = R = 1$ and
+        $K = 2$, $P^+ = (1 - 2)^2 + 4 = 5 > 1$. That is correct, not a flaw: a badly weighted update really does make the estimate worse, and the Joseph form
+        reports its true covariance. The form $(I - KH)P^-$ would report $-1$.
+
+  \item Take $P^- = \begin{bmatrix}10^4 & 9.99\\ 9.99 & 0.01\end{bmatrix}$ (correlation $0.999$), $H = [1\ \ 0]$ and $R = 10^{-4}$, an extremely accurate measurement of the
+        first state, and compute everything in \code{float32}. The gain's first entry $10^4/(10^4 + 10^{-4})$ rounds to exactly $1$, so
+        \[
+          (I - KH)P^- = \begin{bmatrix}0 & 0\\ 9.5\times10^{-7} & 2.0\times10^{-5}\end{bmatrix},
+        \]
+        which is not symmetric, has a zero variance where the true value is $10^{-4}$, and whose symmetrized version has the eigenvalue
+        $-1.1\times10^{-8} < 0$. The Joseph form gives $\begin{bmatrix}1.000\times10^{-4} & 9.99\times10^{-8}\\ 9.99\times10^{-8} & 1.999\times10^{-5}\end{bmatrix}$, positive definite and
+        equal to the exact posterior to four digits. The first diagonal entry shows why: the Joseph form computes $(1 - K_1)^2P^-_{11} + K_1^2R = 0 + R$, so
+        the measurement information enters as a positive term instead of as the tiny difference of two large ones.
+
+  \item Only the covariances can be continued, since they do not depend on measurements. With $P_k^+ = 2P_k^-/(P_k^- + 2)$ and $P_{k+1}^- = P_k^+ + 1$:
+        \begin{center}\small
+        \begin{tabular}{@{}l c c c c c c c@{}}
+        \toprule
+        $k$ & 1 & 2 & 3 & 4 & 5 & 6 & 7 \\
+        \midrule
+        $P_k^-$ & 5 & 2.4286 & 2.0968 & 2.0236 & 2.0059 & 2.0015 & 2.0004 \\
+        $K_k$ & 0.714 & 0.548 & 0.512 & 0.503 & 0.501 & 0.500 & 0.500 \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        $P_k^- \to 2$, and the distance to the limit shrinks by a factor of about four per step: the derivative of the Riccati map at its fixed point is
+        $\big(R/(P^-_\infty + R)\big)^2 = (2/4)^2 = \tfrac14$.
+
+  \item At steady state $P = Pr/(P + r) + q$ for $P = P^-_\infty$. Multiplying by $P + r$: $P^2 + Pr = Pr + qP + qr$, i.e.\ $P^2 - qP - qr = 0$, whose positive root is
+        \[
+          P^-_\infty = \tfrac12\big(q + \sqrt{q^2 + 4qr}\big), \qquad K_\infty = \frac{P^-_\infty}{P^-_\infty + r}, \qquad P^+_\infty = \frac{P^-_\infty r}{P^-_\infty + r} = P^-_\infty - q .
+        \]
+        For $q/r \to 0$: $P^-_\infty \approx \sqrt{qr}$ and $K_\infty \approx \sqrt{q/r} \to 0$. The state barely moves, so the filter averages about $\sqrt{r/q}$ measurements and
+        its error $\sqrt{qr}$ is much smaller than the sensor noise. For $q/r \to \infty$: $P^-_\infty \approx q + r$ and $K_\infty \to 1$. The state moves so much between
+        measurements that each new one is nearly all the information; the filter follows the measurements, and $P^+_\infty \to r$.
+
+  \item The implementation of \cref{alg:kf-update} on the model of \cref{fig:kf1d} (constant velocity, $\Dt = 0.1$~s, acceleration density $\sqrt{0.05}$,
+        position noise variance 1, prior $\diag(4, 4)$) reproduces the figure. In the 200 steps of the figure's run no position error leaves the
+        $\pm3\sigma$ envelope. One run says little, since the expected number is $200 \times 0.27\% \approx 0.5$; over 1000 independent runs the
+        fraction is $0.29\%$, in agreement with the $0.27\%$ of a Gaussian with the correct variance.
+
+  \item For the normalized innovations $\nu_k = r_k/\sqrt{S_k}$ of a long run (5000 steps, the first 50 discarded), the sample autocorrelation
+        $\hat\rho(\ell) = \sum_k\nu_k\nu_{k+\ell}/\sum_k\nu_k^2$ should lie within $\pm1.96/\sqrt N \approx \pm0.028$ at every lag $\ell \ge 1$ if the innovations are white:
+        \begin{center}\small
+        \begin{tabular}{@{}l c c@{}}
+        \toprule
+        filter & $\hat\rho(1), \dots, \hat\rho(5)$ & mean NIS \\
+        \midrule
+        correct $Q$ & $0.00,\ 0.02,\ -0.01,\ 0.01,\ 0.02$ & 1.01 \\
+        $Q/100$ & $0.44,\ 0.45,\ 0.43,\ 0.44,\ 0.44$ & 1.85 \\
+        $100\,Q$ & $-0.11,\ -0.08,\ -0.09,\ -0.07,\ -0.05$ & 0.91 \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        With too little process noise the filter trusts its model too much and lags behind the true motion, so consecutive innovations share the same
+        sign (strong positive correlation, and an NIS well above 1). With too much process noise it overreacts to each measurement and partly
+        corrects back at the next one (negative correlation). The whiteness test detects both, without ground truth.
+\end{solutions}

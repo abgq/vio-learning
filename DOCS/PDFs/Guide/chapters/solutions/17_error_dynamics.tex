@@ -1,0 +1,70 @@
+% Solutions to the exercises of Chapter 17.
+\begin{solutions}
+  \item \ifsolutions
+        With $R = \Exp(\delta\theta_g)\hat R \approx (I + \sx{\delta\theta_g})\hat R$ and $a_m - b_a - n_a = \hat a - \delta b_a - n_a$, substituting into
+        $\dot v = R(a_m - b_a - n_a) + g_w$, subtracting $\dot{\hat v} = \hat R\hat a + g_w$ and dropping second-order products gives
+        \[
+          \dot{\delta v} = \sx{\delta\theta_g}\hat R\hat a - \hat R\,\delta b_a - \hat R\,n_a = -\sx{\hat R\hat a}\,\delta\theta_g - \hat R\,\delta b_a - \hat R\,n_a .
+        \]
+        The local result is $\dot{\delta v} = -\hat R\sx{\hat a}\delta\theta - \hat R\,\delta b_a - \hat R\,n_a$; the two agree through $\delta\theta_g = \hat R\,\delta\theta$ and
+        $\sx{\hat R\hat a} = \hat R\sx{\hat a}\hat R\T$. In the velocity row both forms contain $\hat R$, because the velocity error lives in the world frame. The difference
+        is in the attitude row: the global error obeys $\dot{\delta\theta}_g = -\hat R\,\delta b_g - \hat R\,n_g$ (\cref{ex:global-attitude}), which depends on the heading through $\hat R$,
+        while the local error obeys $\dot{\delta\theta} = -\sx{\hat\omega}\delta\theta - \delta b_g - n_g$, which does not. With the local perturbation the attitude-and-bias
+        part of the error model is independent of where the vehicle points (\cref{sec:boxplus}).
+        \else\withheldsolution\fi
+
+  \item \ifsolutions
+        The attitude row of $F_c$ is $[\,0\ \ 0\ \ {-\sx{\hat\omega}}\ \ 0\ \ {-I}\,]$ in the order $(\delta p, \delta v, \delta\theta, \delta b_a, \delta b_g)$: its $\delta p$ and $\delta v$ blocks are zero, so
+        $\delta\theta$ evolves independently of the position and velocity errors. This is the cascade of the kinematics: the attitude is obtained by
+        integrating the gyroscope alone ($\dot q = \tfrac12q\qprod[0, \hat\omega]$ involves neither $p$ nor $v$), the velocity by integrating the specific force rotated
+        by the attitude, and the position by integrating the velocity. Errors flow downstream only, $\delta b_g \to \delta\theta \to \delta v \to \delta p$ and $\delta b_a \to \delta v$, never
+        upstream, so the blocks above the cascade are zero.
+        \else\withheldsolution\fi
+
+  \item \ifsolutions
+        With the noise ordering $w = (n_a, n_g, n_{b_a}, n_{b_g})$ the noise-input matrix has the blocks $-\hat R$ (velocity, from $n_a$), $-I$ (attitude, from $n_g$), and $I$, $I$
+        (the two biases). Since $\hat R\hat R\T = I$,
+        \[
+          Q_d \approx G_cQ_cG_c\T\Dt = \diag\big(0,\ \sigma_a^2I,\ \sigma_g^2I,\ \sigma_{b_a}^2I,\ \sigma_{b_g}^2I\big)\Dt .
+        \]
+        Units: $\sigma_a^2\Dt$ is $(\mathrm{m/s^2/\sqrt{Hz}})^2\cdot\mathrm s = \mathrm{m^2/s^2}$, a velocity variance; $\sigma_g^2\Dt$ is $\mathrm{rad^2}$, an attitude variance;
+        $\sigma_{b_a}^2\Dt$ is $(\mathrm{m/s^3/\sqrt{Hz}})^2\cdot\mathrm s = \mathrm{m^2/s^4}$, the variance of an acceleration bias; and $\sigma_{b_g}^2\Dt$ is $\mathrm{rad^2/s^2}$. The position block is
+        zero to first order: noise reaches the position only through the velocity, contributing $\sigma_a^2\Dt^3/3$ per step at second order
+        (\cref{ex:double-integrator-qd}).
+        \else\withheldsolution\fi
+
+  \item For a level, stationary IMU each horizontal axis obeys the one-axis chain of \cref{ex:state-models}: $\dot{\delta p} = \delta v$,
+        $\dot{\delta v} = g\,\delta\theta - \delta b_a - n_a$, $\dot{\delta\theta} = -\delta b_g - n_g$, with random-walk biases. (Your full $F_c$ reduces to two copies of this chain in
+        that configuration, which is a good test of it.) Propagate $P \gets \Phi P\Phi\T + Q_d$ with $\Phi = I + F\Dt$ at 200~Hz from $P = 0$ and plot $\sqrt{P_{pp}}$; it
+        follows the analytic total of \eqref{eq:growth-laws}. For the Monte Carlo points, simulate $M = 400$ independent realizations of the same
+        discretized equations, drawing $n_a$ and $n_g$ with standard deviations $\sigma/\sqrt\Dt$ and the bias increments with $\sigma_b\sqrt\Dt$
+        (\cref{sec:ct-noise}), and record the sample standard deviation of $\delta p$ at logarithmically spaced times. With 400 runs the points scatter by
+        about $\pm7\%$ around the curve. The code is \code{fig\_cov\_growth} in \code{scripts/make\_figures.py}.
+
+  \item With no new information the world-frame attitude covariance $\hat RP_{\theta\theta}\hat R\T$ does not change; only the body axes in which $P_{\theta\theta}$ is
+        expressed turn (\cref{rem:cov-rotates}). After a quarter turn about $z$, $\hat R(t) = \hat R(0)R_z(90^\circ)$ and
+        \[
+          P_{\theta\theta}(t) = R_z(90^\circ)\T\,\diag(10^{-4}, 10^{-6}, 10^{-6})\,R_z(90^\circ) = \diag(10^{-6}, 10^{-4}, 10^{-6}):
+        \]
+        the large and a small diagonal entry have swapped. Along the way, at $45^\circ$, the matrix has equal diagonal entries $5.05\times10^{-5}$ and an
+        off-diagonal entry of $\pm4.95\times10^{-5}$. Individual diagonal entries are not monotonic even without noise; the trace and the eigenvalues are constant.
+        A test that requires each diagonal entry of $P$ to grow during propagation is therefore wrong (Milestone 5).
+
+  \item A 10\% error in $\sigma_a$ is a 21\% (or, for $-10\%$, 19\%) error in the predicted variance. With $M$ runs, $(M - 1)s^2/\sigma^2 \sim \chi^2_{M-1}$ under a correct prediction,
+        and the test rejects when $s^2/\sigma^2$ leaves $[\chi^2_{0.025}(M - 1), \chi^2_{0.975}(M - 1)]/(M - 1)$. The probability of rejecting when the true ratio is $1.21$ (or
+        $0.81$) is the power of the test; computing it from the $\chi^2$ distribution gives:
+        \begin{center}\small
+        \begin{tabular}{@{}l c c c c@{}}
+        \toprule
+        runs $M$ & 100 & 200 & 500 & 700 \\
+        \midrule
+        power against $\sigma_a$ 10\% too small (ratio 1.21) & 0.30 & 0.50 & 0.86 & 0.95 \\
+        power against $\sigma_a$ 10\% too large (ratio 0.81) & 0.29 & 0.53 & 0.91 & 0.98 \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        About 600--700 runs are needed to detect a 10\% error with 95\% probability (by the normal approximation, the interval half-width
+        $1.96\sqrt{2/M}$ plus $1.645$ times the alternative's spread must be below $0.21$). Two practical remedies: test several independent quantities at
+        once (the three axes, several times along the trajectory), which multiplies the effective number of samples, and use larger errors when the
+        purpose is only to show that the test can fail.
+\end{solutions}

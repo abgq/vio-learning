@@ -1,0 +1,116 @@
+% Solutions to the exercises of Chapter 3.
+\begin{solutions}
+  \item \emph{Without pivoting} the multiplier is $\ell_{21} = 1/10^{-20} = 10^{20}$. The second row becomes
+        \[
+          (1 - 10^{20})\,x_2 = 2 - 10^{20},
+        \]
+        and in double precision both $1 - 10^{20}$ and $2 - 10^{20}$ round to $-10^{20}$: the information carried by the original entries
+        $1$ and $2$ is lost. Hence $x_2 = 1$ and back substitution gives $x_1 = (1 - x_2)/10^{-20} = 0$. \emph{With partial pivoting} the rows
+        are swapped, the multiplier is $10^{-20}$, the second row becomes $(1 - 10^{-20})\,x_2 = 1 - 2\times10^{-20}$, which rounds to
+        $x_2 = 1$, and $x_1 = 2 - x_2 = 1$. The exact solution is $x_1 = 1/(1 - 10^{-20})$, $x_2 = (1 - 2\times10^{-20})/(1 - 10^{-20})$, both equal to 1
+        to all printed digits. The matrix is well conditioned ($\kappa \approx 2.6$); the failure is entirely the algorithm's. A tiny pivot
+        produces a huge multiplier, the elimination step adds huge numbers to small ones, and the rounding errors of that step are
+        of the size of the huge numbers. Pivoting keeps every multiplier at most one in magnitude, which bounds this growth.
+
+  \item Column by column with the formulas of \cref{thm:cholesky}: $L_{11} = \sqrt4 = 2$, $L_{21} = 2/2 = 1$, $L_{31} = 2/2 = 1$;
+        $L_{22} = \sqrt{5 - 1^2} = 2$, $L_{32} = (3 - 1\cdot1)/2 = 1$; $L_{33} = \sqrt{6 - 1^2 - 1^2} = 2$. So
+        \[
+          L = \begin{bmatrix}2 & 0 & 0\\ 1 & 2 & 0\\ 1 & 1 & 2\end{bmatrix}.
+        \]
+        Forward substitution $Ly = (8, 10, 11)$ gives $y = (4, 3, 2)$, and back substitution $L\T x = y$ gives $x_3 = 1$, $x_2 = (3 - 1)/2 = 1$,
+        $x_1 = (4 - 1 - 1)/2 = 1$. Check: $S(1, 1, 1)\T = (8, 10, 11)\T$.
+
+  \item The block matrix is a sum of PSD terms:
+        \[
+          M = \begin{bmatrix}S & HP\\ PH\T & P\end{bmatrix}
+            = \begin{bmatrix}H\\ I\end{bmatrix}P\begin{bmatrix}H\T & I\end{bmatrix} + \begin{bmatrix}R & 0\\ 0 & 0\end{bmatrix} \succeq 0,
+        \]
+        the first a congruence of $P \succ 0$ and the second PSD because $R \succ 0$ (\cref{prop:psd}). Since $S = HPH\T + R \succ 0$, the block
+        factorization of \cref{prop:block-inverse} writes $M$ as a congruence of $\diag(S,\ M/S)$ by an invertible unit-triangular matrix, with
+        $M/S = P - PH\T S\inv HP$. A congruence by an invertible matrix preserves semi-definiteness in both directions, so $M \succeq 0$ implies
+        $M/S \succeq 0$. Finally $KSK\T = PH\T S\inv SS\inv HP = PH\T S\inv HP$, so $P - KSK\T = M/S \succeq 0$. This is the statement that a Kalman
+        update never increases uncertainty (\cref{ch:kf}).
+
+  \item A compact implementation, storing each reflection and applying it to the remaining columns:
+\begin{lstlisting}[style=py]
+def householder_qr(A):
+    A = A.astype(float).copy(); m, n = A.shape; vs = []
+    for k in range(n):
+        x = A[k:, k].copy()
+        v = x.copy(); v[0] += np.copysign(np.linalg.norm(x), x[0])
+        v /= np.linalg.norm(v)
+        A[k:, k:] -= 2.0 * np.outer(v, v @ A[k:, k:])   # apply H_k
+        vs.append(v)
+    Q = np.eye(m)
+    for k in reversed(range(n)):                        # Q = H_1 H_2 ... H_n
+        Q[k:, :] -= 2.0 * np.outer(vs[k], vs[k] @ Q[k:, :])
+    return Q, np.triu(A[:n, :])
+\end{lstlisting}
+        For a random $10\times3$ matrix, $\|Q\T Q - I\| \approx 10^{-15}$, $\|Q_1R_1 - A\| \approx 2\times10^{-15}$ and $\|Q_2\T A\| \approx 5\times10^{-16}$: the last
+        seven columns of $Q$ are an orthonormal basis of the left nullspace, as \cref{prop:qr-nullspace} states. For the least-squares test, build
+        $A = U\diag(1, 10^{-4}, 10^{-8})V\T$ with random orthonormal $U \in \R^{10\times3}$ and $V$, choose $x = (1, 2, 3)$ and $b = Ax$. A typical run
+        gives a relative error of $0.14$ for the normal equations and $3\times10^{-9}$ for QR. The normal equations work with
+        $\kappa(A\T A) = 10^{16}$ and lose all sixteen digits; QR works with $\kappa(A) = 10^8$ and keeps about eight, the most any algorithm can
+        keep for this problem.
+
+  \item Let $H_f = Q\begin{bmatrix}R_1\\0\end{bmatrix} = Q_1R_1$ with $Q = [Q_1\ Q_2]$ orthogonal and $R_1$ invertible (full column rank). Then
+        \[
+          H_f(H_f\T H_f)\inv H_f\T = Q_1R_1\big(R_1\T Q_1\T Q_1R_1\big)\inv R_1\T Q_1\T = Q_1R_1R_1\inv R_1\mT R_1\T Q_1\T = Q_1Q_1\T .
+        \]
+        Because $Q$ is orthogonal, $QQ\T = Q_1Q_1\T + Q_2Q_2\T = I$, so $I - H_f(H_f\T H_f)\inv H_f\T = Q_2Q_2\T$. Any other orthonormal basis $A_\perp$ of
+        $\nullsp(H_f\T) = \range(Q_2)$ (\cref{prop:qr-nullspace}) is $A_\perp = Q_2O$ for an orthogonal matrix $O$, hence
+        $A_\perp A_\perp\T = Q_2OO\T Q_2\T = Q_2Q_2\T$, which proves \eqref{eq:nullspace-projector}.
+
+  \item Apply \cref{thm:woodbury} with $A = P\inv$, $U = H\T$, $C = R\inv$, $V = H$:
+        \[
+          \big(P\inv + H\T R\inv H\big)\inv = P - PH\T\big(R + HPH\T\big)\inv HP .
+        \]
+        With $n = 75$ states and $m$ measurements, the right side forms $PH\T$ and $HPH\T$ (about $2mn^2 + 2m^2n$ flops), factors the $m\times m$
+        matrix $S$ ($m^3/3$) and forms the product (about $2mn^2$); the left side needs $P\inv$, the product $H\T R\inv H$ (about $mn^2$ for a
+        diagonal $R$) and the inverse of an $n\times n$ matrix (two $n\times n$ inversions, about $2n^3 \approx 8\times10^5$ flops). For $m = 2$ the
+        right side costs about $5\times10^4$ flops, some fifteen times less: this is why the Kalman filter is written in covariance form. For
+        $m = 500$ the right side costs about $8\times10^7$ flops (dominated by $m^3/3$ and $2m^2n$), while the left side costs only about
+        $4\times10^6$: with more measurements than states, the information form is cheaper. The MSCKF obtains the same saving without leaving
+        the covariance form by compressing tall measurements with QR (\cref{prop:compression}).
+
+  \item Let $J = \begin{bmatrix}0 & -1\\ 1 & 0\end{bmatrix}$, so the matrix is $\theta J$. Since $J^2 = -I$, the powers repeat with period four:
+        $J^{2k} = (-1)^kI$ and $J^{2k+1} = (-1)^kJ$. Splitting the series into even and odd terms,
+        \[
+          \exp(\theta J) = \sum_k\frac{(-1)^k\theta^{2k}}{(2k)!}I + \sum_k\frac{(-1)^k\theta^{2k+1}}{(2k+1)!}J = \cos\theta\,I + \sin\theta\,J
+          = \begin{bmatrix}\cos\theta & -\sin\theta\\ \sin\theta & \cos\theta\end{bmatrix},
+        \]
+        the planar rotation by $\theta$ (\cref{ex:rot2d}): the planar instance of \cref{prop:exp-skew}.
+
+  \item $A$ and $B$ are nilpotent ($A^2 = B^2 = 0$), so $\exp(A) = I + A = \begin{bmatrix}1 & 1\\0 & 1\end{bmatrix}$ and
+        $\exp(B) = \begin{bmatrix}1 & 0\\1 & 1\end{bmatrix}$, whose product is $\begin{bmatrix}2 & 1\\ 1 & 1\end{bmatrix}$. On the other hand
+        $C = A + B = \begin{bmatrix}0 & 1\\1 & 0\end{bmatrix}$ satisfies $C^2 = I$, so
+        \[
+          \exp(A + B) = \cosh(1)\,I + \sinh(1)\,C = \begin{bmatrix}1.543 & 1.175\\ 1.175 & 1.543\end{bmatrix} \ne \begin{bmatrix}2 & 1\\ 1 & 1\end{bmatrix}.
+        \]
+        The matrices do not commute: $AB = \diag(1, 0)$ while $BA = \diag(0, 1)$, so property 3 of \cref{prop:matexp} does not apply.
+
+  \item Doubles in $[2^{30}, 2^{31})$ are spaced by $2^{30-52} = 2^{-22}$~s $\approx 238$~ns. Unix time today ($\approx 1.8\times10^9$~s) lies in that
+        range. A single $\Dt$ computed as a difference of two such numbers is wrong by up to about $10^{-7}$~s, a relative error of a few
+        times $10^{-5}$ on a 5~ms step; at 1~rad/s that is an attitude error of $10^{-7}$~rad per step, well below the gyro noise per step
+        ($\sigma_g\sqrt\Dt \approx 10^{-5}$~rad). So differences would be tolerable, but the representation still fails the project's needs:
+        \begin{itemize}[leftmargin=1.2em]
+          \item it cannot hold EuRoC's nanosecond timestamps exactly, so equal timestamps may compare unequal and event ordering may change;
+          \item \emph{accumulating} time is disastrous: adding $0.005$ to a double near $1.79\times10^9$ rounds the same way at every step, and one
+                hour at 200~Hz ($720\,000$ additions) drifts by 82~ms in a simulation.
+        \end{itemize}
+        Absolute time therefore stays in 64-bit integer nanoseconds, and only differences are converted (AGENTS.md C5).
+
+  \item Multiply and divide by the conjugate:
+        \[
+          \sqrt{x^2 + 1} - x = \frac{1}{\sqrt{x^2 + 1} + x},
+        \]
+        which adds two positive numbers instead of subtracting nearly equal ones. At $x = 10^8$ the original form returns exactly $0$
+        (because $x^2 + 1$ rounds to $x^2$), the rewritten one $5\times10^{-9} \approx 1/(2x)$. Using \code{hypot(x, 1)} for the square root also
+        avoids overflow of $x^2$ for $|x| > 10^{154}$. For the second expression use $1 - \cos x = 2\sin^2(x/2)$:
+        \[
+          \frac{1 - \cos x}{x^2} = \frac12\left(\frac{\sin(x/2)}{x/2}\right)^2,
+        \]
+        which involves no subtraction (and $\sin(y)/y$ is accurate for small $y$, or can be replaced by its series $1 - y^2/6$). At $x = 10^{-8}$
+        the original form returns $0$ and the rewritten one $0.5$; at $x = 10^{-5}$ the original is wrong in the eighth digit
+        (\cref{ex:cancellation}).
+\end{solutions}

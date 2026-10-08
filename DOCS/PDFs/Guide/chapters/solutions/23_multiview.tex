@@ -1,0 +1,76 @@
+% Solutions to the exercises of Chapter 23.
+\begin{solutions}
+  \item With 20 random points at 3--8~m and a random relative pose, $|\bar x_2\T E\bar x_1| \le 3\times10^{-17}$: rounding error. Moving one observation in the second image
+        by 27~px gives an algebraic residual of $8\times10^{-3}$ and a Sampson distance $\sqrt{d_S}$ of $5.4$~px. Only the component of the error perpendicular to the
+        epipolar line is visible (7.7~px of the 27~px here), and the Sampson distance spreads it over both images ($7.7/\sqrt2 = 5.4$). A two-view check cannot
+        detect an error \emph{along} the epipolar line at all; a third view, or the filter's own gating, must catch those.
+
+  \item Since $RR\T = I$ and $\sx{t}\T = -\sx{t}$, $EE\T = -\sx{t}^2 = \|t\|^2I - tt\T$ (\eqref{eq:skew-sq}). Every vector orthogonal to $t$ is an eigenvector with eigenvalue
+        $\|t\|^2$, and $t$ itself has eigenvalue 0, so the singular values of $E$ are $(\|t\|, \|t\|, 0)$ and its rank is two. Degrees of freedom: $R$ has three and $t$ three,
+        but the constraint $\bar x_2\T E\bar x_1 = 0$ is homogeneous, so $E$ and $\lambda E$ (i.e.\ $t$ and $\lambda t$) are indistinguishable: $3 + 2 = 5$. Scaling the scene and
+        the baseline together leaves every bearing unchanged, so the scale of $t$ cannot be recovered from images. For the epipoles,
+        \[
+          t\T E = t\T\sx{t}R = -(\sx{t}t)\T R = -(t\times t)\T R = 0, \qquad E(R\T t) = \sx{t}t = 0 .
+        \]
+        The left null vector is $t$, the coordinates of the first camera center in the second frame ($X_1 = 0 \Rightarrow X_2 = t$), so $e_2 \propto t$ is its image. Likewise
+        $e_1 \propto R\T t$ is the image of the second center ($X_2 = 0 \Rightarrow X_1 = -R\T t$).
+
+  \item With 60 points, 0.5~px noise and 200 random scenes, recovering $(R, t)$ from $E = K\T FK$:
+        \begin{center}\small
+        \begin{tabular}{@{}l c c c@{}}
+        \toprule
+        & $\sigma_1/\sigma_8$ of $A$ & rotation error & direction of $t$ \\
+        & & median / 90\% & median / 90\% \\
+        \midrule
+        raw pixels & $1.5\times10^5$ & $0.33^\circ$ / $1.6^\circ$ & $2.5^\circ$ / $11^\circ$ \\
+        Hartley-normalized & 66 & $0.16^\circ$ / $0.34^\circ$ & $1.1^\circ$ / $2.4^\circ$ \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        In pixels, the columns of $A$ range from $1$ to $10^5$, so the smallest singular vector is dominated by rounding and by the noise in the large entries.
+        Normalization makes all columns comparable. It halves the typical error and removes the bad cases, which matter most inside RANSAC.
+
+  \item Take the SVD of $E$, flip the sign of $U$ or $V$ if its determinant is $-1$ (allowed, since $E$ is defined up to sign), and form the four candidates. For each,
+        triangulate every correspondence (two depths from $\lambda_2\bar x_2 = \lambda_1R\bar x_1 + t$ by least squares) and count the points with both depths positive. In 500 random
+        scenes, the true solution won every time, with all points in front of both cameras. For each wrong candidate, \emph{all} points failed: in a typical scene one
+        candidate put them in front of the first camera but behind the second, and the other two put them behind the first. With noisy data, use the count, not
+        a requirement that every point pass.
+
+  \item With $R$ known, each correspondence gives $c_i = R\bar x_1^{(i)}\times\bar x_2^{(i)}$, the hypothesis is $t \propto c_i\times c_j$, and inliers have $\sqrt{d_S}$ below the threshold (2~px).
+        For 100 correspondences with 1-pixel noise and 30\% outliers, adaptive RANSAC stopped after 9.8 iterations on average ($\lceil\log0.01/\log(1 - 0.7^2)\rceil = 7$
+        at the true ratio; the observed ratio is slightly lower because the threshold rejects some inliers). After refitting $t$ to all inliers (the unit $t$
+        minimizing $\sum(t\T c_i)^2$), the median direction error was $0.6^\circ$; 4.6\% of the inliers were rejected (the expected rate of a $2\sigma$ threshold) and 1.3\% of the
+        outliers accepted (those lying near their epipolar line by chance). The five-point method needs $\lceil\log0.01/\log(1 - 0.7^5)\rceil = 26$ iterations at the same confidence,
+        each solving a degree-10 polynomial and scoring up to ten candidates, against one cross product. The price of the two-point method is its dependence
+        on the gyroscope: a rotation error $\delta$ shifts predicted points by about $f\delta$ pixels, so the threshold must cover the gyro error accumulated between
+        frames.
+
+  \item With $t = 0$, every correspondence satisfies $\bar x_2 \propto R\bar x_1$, so $\bar x_2\T\sx{t}R\bar x_1 = \bar x_2\T(t\times R\bar x_1) = 0$ for \emph{every} $t$. The data fit the
+        whole family $E = \sx{t}R$, and the eight-point matrix $A$ has three singular values at the noise level instead of one. In simulation, a randomly chosen
+        $t$ combined with the true $R$ fits 68--70\% of the tracks to within 1~px, exactly the fraction the true model fits with 1-pixel noise. Whatever
+        \code{cv::findEssentialMat} returns therefore has an arbitrary translation direction that changes from run to run, and its inlier set is no test of the
+        tracks, since the free $t$ can turn epipolar lines through outliers. The parallax test: the median of $\|\pi(R\bar x_1) - \pi(\bar x_2)\|$ over the tracks was
+        $1.6$~px under pure rotation (noise only) and $8.8$~px for a 10~cm sideways motion with points at 3--8~m. A threshold of a few pixels separates the two
+        regimes. Below it, check tracks only against $\bar x_2 \propto R\bar x_1$.
+
+  \item The matrix $\sx{\bar x_i}$ has rank two (its nullspace is $\bar x_i$), and multiplying by the invertible $R_{wc_i}\T$ keeps the rank, so each view contributes three
+        equations of rank two. For two views, $p$ is in the nullspace of the stacked matrix if and only if $R_{wc_i}\T p \parallel \bar x_i$ for both views, i.e.\ $p$ is parallel to both ray
+        directions $r_i = R_{wc_i}\bar x_i$. If the rays are not parallel, only $p = 0$ qualifies: the $6\times3$ matrix has full column rank, and the least-squares solution
+        is unique. Parallel rays (zero parallax) leave a one-dimensional nullspace, the position along the ray.
+
+  \item With the baseline perpendicular to the viewing direction, $Z = b/d$ with disparity $d = x_1 - x_2$. The two noises are independent, so $\sigma_d = \sqrt2\sigma_{uv}$, and to first
+        order $\sigma_Z = |\partial Z/\partial d|\,\sigma_d = (b/d^2)\sqrt2\sigma_{uv} = (Z^2/b)\sqrt2\sigma_{uv}$. A Monte Carlo at $Z = 5$~m with 1-pixel noise reproduces the figure: relative errors
+        of $17.7\%$, $8.8\%$, $3.5\%$, $1.8\%$ at parallax angles of $1^\circ$, $2^\circ$, $5^\circ$, $10^\circ$, matching the formula. For three views at $0$, $b/2$ and $b$, write the
+        observations as $x_i = X/Z - s_i/Z + n_i$, with $s_i$ the camera positions along the baseline. The inverse depth $1/Z$ is the \emph{slope} of a straight-line fit of $x_i$
+        against $s_i$, with variance $\sigma_{uv}^2/\sum_i(s_i - \bar s)^2$. A view at the mean position $\bar s$ adds nothing to this sum: three views give the same depth accuracy as
+        two (simulation: within 2\%), and five equally spaced views improve it by only 11\%. Depth accuracy is bought with baseline; intermediate views
+        add redundancy, which is what outlier detection and the MSCKF's nullspace projection need.
+
+  \item Monocular bundle adjustment has seven gauge freedoms: a global translation (3), a global rotation (3) and a global scale (1) leave all reprojection errors
+        unchanged. Visual--inertial bundle adjustment has four: translation (3) and rotation about the gravity direction (1). The accelerometer measures
+        specific force in the body frame, and the residuals compare it with $R_{wb}\T(a_w - g_w)$ for the fixed $g_w$. A global rotation about a horizontal axis would tilt the
+        trajectory relative to gravity and change these residuals, so roll and pitch are observable. A rotation about the vertical leaves $g_w$ invariant and
+        changes nothing. Scale becomes observable because the IMU measures metric accelerations, which a scaled trajectory would contradict, provided
+        the motion actually accelerates (at constant velocity, scale is unobservable again). Consequently, fix the gauge of a visual--inertial problem with
+        the first position and yaw only: fixing roll and pitch as well would inject false information.
+\end{solutions}

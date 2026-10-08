@@ -1,0 +1,53 @@
+% Solutions to the exercises of Chapter 28.
+\begin{solutions}
+  \item With the clone created first, an image at $t_c$ is handled as follows:
+        \begin{enumerate}[label=\arabic*:, leftmargin=2.2em, itemsep=0pt]
+          \item propagate to $t_c$; run the front end;
+          \item clone $(\hat p, \hat q)$; $P \gets JPJ\T$; attach this image's observations to the new clone (now $N + 1$ clones);
+          \item process the tracks lost in this image;
+          \item \textbf{if} $N + 1 > $ \code{kMaxClones}: process the tracks with an observation at the oldest clone (including the current observation), then
+                marginalize the oldest clone.
+        \end{enumerate}
+        The window transiently holds \code{kMaxClones}$\,+\,1$ clones, so every fixed-max buffer ($P$, the stacked $H$, the clone container) must be sized for
+        $15 + 6(\text{\code{kMaxClones}} + 1)$ states. The gain: a track processed because its oldest clone is leaving can include the current image's observation. That is
+        its newest view and usually the one with the most parallax relative to the oldest, so it adds two rows per track and lengthens the baseline. The price
+        is an update on a state six dimensions larger, about $(81/75)^3 \approx 1.26$ times the cost for \code{kMaxClones}$\,= 10$.
+
+  \item Log, for every update, the number of features processed, each feature's $M_j$, and $d = \sum_j(2M_j - 3)$, and plot the distribution over all sequences. The
+        planar filter of \cref{ch:planar} ($N_{\max} = 10$, 4\,500 updates) shows the typical shape. On average 2.4 features are processed per update. Most tracks reach the full
+        window ($M = 10$ for 90\% of them), because they are processed when their oldest clone leaves. The rows per update have median 16 and 99th percentile 56,
+        but the maximum is 175. The tail comes from bursts: when the window first fills, or when many features leave the view together, nearly every visible
+        feature is processed at once. The worst case is therefore (visible features)$\,\times\,$(rows per full track): $150\times(2\cdot10 - 3) = 2550$ rows for the
+        project. There are two sound ways to set the cap:
+        \begin{itemize}
+          \item size the workspace for the worst case: $2550\times76$ doubles are 1.5~MB, allocated once at load time;
+          \item better, compress incrementally: append features until the next one would not fit, QR-compress the stack to $n$ rows
+                (\cref{prop:compression}), and continue. The workspace then needs only $n$ plus one feature's rows ($75 + 17$), and no feature is ever dropped.
+        \end{itemize}
+        A cap at a percentile of the distribution without either measure would silently discard information in exactly the bursts that matter. If it is used,
+        the dropped features must be counted and logged.
+
+  \item One test per row of \cref{tab:debugging}:
+        \begin{itemize}
+          \item \emph{$2g$ altitude divergence:} propagate a level, stationary IMU ($a_m = (0, 0, 9.81)$, $\omega_m = 0$) for 10~s from rest; position and velocity must stay
+                zero to rounding. Then propagate free fall ($a_m = 0$) and require $v_z = -9.81\,t$.
+          \item \emph{Divergence within seconds:} loader tests on a fixture row with distinct values in every column (catching $w$/$z$ swaps, gyro/accel and bias column
+                order, degrees). A coning test against an analytic attitude. On EuRoC, propagate IMU-only from ground truth for 1~s and compare with ground truth.
+          \item \emph{Vectors slowly scaled:} after $10^6$ random multiplicative updates, $\big|\|q\| - 1\big| < 10^{-12}$.
+          \item \emph{NaN:} $\Exp$, $\Log$ and $\Jrinv$ at $0$, $10^{-12}$, $\pi - 10^{-9}$ and exactly $\pi$; triangulation must reject zero and negative depths; feeding a non-PD $S$ must return an
+                error, not a NaN; a randomized test asserting finite outputs.
+          \item \emph{Corrections make things worse:} finite-difference tests of every Jacobian on $\bplus/\bminus$. An update with a noise-free measurement must reduce the
+                error. A mutation check: flip a sign in $H$ and confirm the test fails.
+          \item \emph{Covariance loses symmetry or definiteness:} after $10^4$ random updates, $\|P - P\T\| < 10^{-12}\|P\|$ and $\lambda_{\min}(P) \ge 0$. Compare in-place block products with an
+                out-of-place reference.
+          \item \emph{All features gated out:} a synthetic VIO run with the true noise must reject about 5\% of the features (say 3--8\%). A camera-model test projects a hand-computed
+                point through $T_{bc}$ from \code{sensor.yaml}. A unit test checks $\sigma_{uv} = \sigma_{px}/f$.
+          \item \emph{Gate rejects nothing:} the same run, with a lower bound on the rejection rate; the $\chi^2$ table checked against reference values, indexed by
+                $\dim r$.
+          \item \emph{Growing yaw error:} per-component NEES on synthetic data; position, roll and pitch must be consistent, and yaw growth is documented as expected.
+          \item \emph{Scale drift:} two synthetic runs, with low and high acceleration; the scale error must be bounded in the excited run.
+          \item \emph{Synthetic fine, EuRoC fails:} parse the real \code{T\_BS} (row-major) and intrinsics, and compare with hand-copied values; distortion round trip at the corners and
+                edges (Exercise~20.5); merge-order test (IMU before image at equal times); IMU-gap detection ($\Dt > 2\times$ nominal flagged).
+          \item \emph{Run-to-run differences:} run the pipeline twice in one test and compare outputs bitwise; sanitizers in CI; seeded generators.
+        \end{itemize}
+\end{solutions}

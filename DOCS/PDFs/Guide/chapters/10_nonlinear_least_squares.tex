@@ -1,4 +1,4 @@
-\chapter[Nonlinear Least Squares and Optimization]{Nonlinear Least Squares\\ and Optimization}
+\chapter{Nonlinear Least Squares and Optimization}
 \label{ch:nlls}
 \chaptermark{Nonlinear Least Squares} % short running header
 
@@ -60,7 +60,6 @@ step can go uphill.
 \section{Gauss--Newton}
 \label{sec:gauss-newton}
 
-\index{Gauss--Newton method}
 Least-squares problems allow a better compromise. Linearize the \emph{residuals} rather than the cost: $r(x + \delta) \approx r + J\delta$. The cost then
 becomes a linear least-squares problem in $\delta$,
 \begin{equation}
@@ -96,7 +95,6 @@ or an unobservable direction), and the step is undefined.
 
 \section{Levenberg--Marquardt}
 
-\index{Levenberg--Marquardt method}
 The \term{Levenberg--Marquardt} (LM) method damps the Gauss--Newton step:
 \begin{equation}
   \big(J\T WJ + \lambda D\big)\,\delta = -J\T Wr, \qquad \lambda \ge 0,
@@ -278,3 +276,4 @@ are two ends of one spectrum, distinguished by how often they re-linearize and w
   \item Prove that the reduced camera system equals the inverse of the camera block of $(J\T WJ)\inv$, and interpret this as marginalization.
   \item Write out one iteration of the iterated EKF and show that it reduces to the standard EKF update after the first iteration.
 \end{exercises}
+\input{chapters/solutions/10_nonlinear_least_squares}

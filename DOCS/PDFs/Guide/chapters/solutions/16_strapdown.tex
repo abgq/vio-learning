@@ -1,0 +1,43 @@
+% Solutions to the exercises of Chapter 16.
+\begin{solutions}
+  \item Choose a non-trivial initial state ($R_0 = \Exp(0.2, -0.1, 0.4)$, $v_0 = (1, 0.5, -0.2)$, $p_0 = (0.1, 0.2, 0.3)$), constant inputs
+        $\hat\omega = (0.3, -0.5, 0.8)$~rad/s and $\hat a = (1, -2, 9)~\mathrm{m/s^2}$, and a long step $\Dt = 0.5$~s so that $\|\phi\| = 0.5$~rad and the correction terms
+        are large. Integrating $\dot R = R\sx{\hat\omega}$, $\dot v = R\hat a + g_w$, $\dot p = v$ with \code{scipy.integrate.solve\_ivp} (DOP853, tolerances $10^{-13}$) and
+        comparing with \cref{prop:exact-prop} gives differences of $2\times10^{-15}$ in $R$ and $8\times10^{-15}$ in $v$ and $p$: the closed forms are exact. Setting
+        $\Jl = I$ and $N = \tfrac12I$ instead produces errors of order $\tfrac12\|\phi\|\,\|\hat a\|\Dt$, many orders of magnitude larger.
+
+  \item With constant $\hat\omega$ the Euler scheme's attitude update $\hat R_k\Exp(\hat\omega\Dt)$ is exactly \cref{prop:const-rate}. Its velocity update uses
+        $\hat R_k\hat a\,\Dt$, while the exact increment is $\hat R_k\Dt\Jl(\phi)\hat a$ with $\Jl(\phi) = I + \tfrac12\sx{\phi} + O(\|\phi\|^2)$. The error per step is
+        \[
+          \hat R_k\Dt\big(\Jl(\phi) - I\big)\hat a = \tfrac12\hat R_k\,\Dt^2\,\hat\omega\times\hat a + O(\Dt^3),
+        \]
+        a fraction $\tfrac12\|\hat\omega\|\Dt\sin\angle(\hat\omega, \hat a)$ of the step's velocity increment: $0.25\%$ at 1~rad/s and 200~Hz (a numerical check gives
+        exactly $0.0025$). It is the effect of holding the specific force fixed in the body frame at the start of the step while the body rotates;
+        it is systematic, so it accumulates.
+
+  \item Running the code of \cref{fig:integration-order} gives position errors after 10~s at 200~Hz of $1.0$~m (Euler), $7\times10^{-4}$~m (midpoint) and
+        $3\times10^{-4}$~m (RK4 with interpolated mid-samples), each scaling with its order. Adding EuRoC's gyro and accelerometer white noise to the
+        samples and repeating 40 times gives a noise-induced RMS position error of about $0.17$--$0.19$~m after 10~s, the same at 100, 200 and 800~Hz:
+        sampling faster does not reduce the noise per unit time (\cref{sec:ct-noise}). The noise error is therefore a horizontal line on the plot, and
+        each integration error curve crosses it where:
+        \begin{itemize}[leftmargin=1.2em]
+          \item Euler: its error $\approx 1.0~\mathrm m\times(200/f)$ falls below $0.18$~m only above about $1.1$~kHz, faster than most MEMS IMUs deliver;
+          \item midpoint and interpolated RK4: their errors are below the noise at every rate tested, down to 25~Hz ($0.045$ and $0.022$~m).
+        \end{itemize}
+        At EuRoC's 200~Hz a second-order scheme makes the integration error two to three orders of magnitude smaller than the noise, which is the
+        requirement of \cref{ch:strapdown}.
+
+  \item Generate one second of static accelerometer samples at 200~Hz for a known tilt (roll $5^\circ$, pitch $-3^\circ$) with EuRoC noise, average them, and apply
+        the initializer. The estimated ``up'' direction is within $0.2$~mrad of the truth (the residual is the noise of the average,
+        $\sigma_a/\sqrt{1\,\mathrm s}/g$ per axis). Adding a body-frame bias $b_a = (0.05, 0, 0)~\mathrm{m/s^2}$, almost horizontal for this attitude, moves the estimate by
+        $4.9$~mrad, against the prediction $\|b_{a,\perp}\|/g = 5.1$~mrad, where $b_{a,\perp}$ is the component perpendicular to gravity (the difference is the noise
+        of the average). The reason: the initializer takes the direction of $R\T(-g_w) + b_a$ to be ``up''; a horizontal bias tilts that vector by
+        $\arctan(\|b_{a,\perp}\|/g) \approx \|b_{a,\perp}\|/g$, and nothing in a static recording distinguishes it from a real tilt.
+
+  \item The clone must be the pose at the image timestamp $t_c$. Propagating only to the nearest IMU sample makes the clone the pose at a time that
+        differs from $t_c$ by up to half a sample period, $\Dt/2 = 2.5$~ms at 200~Hz (1.25~ms on average, for a uniformly distributed offset). At 1~rad/s
+        the attitude error is up to $2.5$~mrad, comparable to the angle subtended by one pixel of the EuRoC camera ($1/458 \approx 2.2$~mrad), and at 1~m/s the
+        position error is up to $2.5$~mm. Unlike pixel noise this error is not random from the filter's point of view: it is correlated with the motion,
+        so it biases every visual constraint during fast rotations. Interpolating the IMU sample at $t_c$ and propagating exactly to it removes the error
+        at no cost.
+\end{solutions}

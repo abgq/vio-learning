@@ -32,7 +32,7 @@ nearby pixels (\cref{sec:image-derivatives}). Both operations are sensitive to n
 \subsection{Correlation and convolution}
 
 \index{convolution}
-\term{Linear filtering} replaces each pixel by a weighted sum of its neighbors, with the weights given by a small array $h$, the \emph{kernel}. Two closely related
+\termi{Linear filtering}{linear filtering} replaces each pixel by a weighted sum of its neighbors, with the weights given by a small array $h$, the \emph{kernel}. Two closely related
 forms exist:
 \begin{equation}
 \begin{aligned}
@@ -149,7 +149,7 @@ weights for speed, which limits the attainable sub-pixel resolution to a few hun
 % ==============================================================================
 \section{Finding local maxima}
 
-Detectors compute a response map (corner strength, for example) and select the pixels where it is large \emph{and} locally maximal. \term{Non-maximum suppression}
+Detectors compute a response map (corner strength, for example) and select the pixels where it is large \emph{and} locally maximal. \termi{Non-maximum suppression}{non-maximum suppression}
 keeps a pixel only if its response exceeds a threshold and is the largest in its neighborhood (a $3\times3$ window, or a larger radius to enforce spacing between
 detections). The location of a maximum can then be refined below the pixel grid by fitting a parabola through the response $r_{-1}, r_0, r_1$ at the maximum and its two
 neighbors in each direction; the vertex lies at the offset
@@ -186,3 +186,4 @@ along with the motion; others pre-process images, for example with histogram equ
   \item Derive the bilinear interpolation formula by interpolating first along $u$ and then along $v$, and show that the result does not depend on the order.
   \item Derive the parabola-vertex formula for sub-pixel peak refinement.
 \end{exercises}
+\input{chapters/solutions/21_image_processing}

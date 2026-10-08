@@ -1,0 +1,49 @@
+% Solutions to the exercises of Chapter 11.
+\begin{solutions}
+  \item With $x = (y, \dot y)$,
+        \[
+          \dot x = \begin{bmatrix}0 & 1\\ -k/m & -c/m\end{bmatrix}x + \begin{bmatrix}0\\ 1/m\end{bmatrix}u .
+        \]
+        The characteristic polynomial is $\lambda^2 + (c/m)\lambda + k/m$, so $\lambda = \big(-c \pm \sqrt{c^2 - 4km}\big)/2m$, or
+        $\lambda = -\zeta\omega_n \pm \omega_n\sqrt{\zeta^2 - 1}$ with $\omega_n = \sqrt{k/m}$ and $\zeta = c/(2\sqrt{km})$. For $m > 0$ both roots have negative real parts
+        exactly when $c > 0$ and $k > 0$ (a quadratic with positive coefficients): the system is asymptotically stable. Underdamped ($\zeta < 1$) it
+        oscillates with decaying amplitude; with $c = 0$ the eigenvalues $\pm i\omega_n$ lie on the imaginary axis and the system is only marginally stable;
+        with $k < 0$ (a negative spring) one eigenvalue is positive and it is unstable. This is the accelerometer model of \cref{ch:imu}.
+
+  \item With $F = \begin{bmatrix}0 & 1\\0 & 0\end{bmatrix}$ and $B = \begin{bmatrix}0\\1\end{bmatrix}$, $e^{Fs}B = \begin{bmatrix}s\\1\end{bmatrix}$ (\cref{ex:double-integrator}), so
+        \[
+          \Gamma = \int_0^\Dt e^{Fs}B\,\dd s = \begin{bmatrix}\Dt^2/2\\ \Dt\end{bmatrix}.
+        \]
+        An acceleration $a$ held constant over the step adds $\tfrac12a\Dt^2$ to the position and $a\Dt$ to the velocity: the familiar kinematics of constant
+        acceleration, exact for a zero-order-hold input. The block exponential $\exp\big(\begin{bmatrix}F & B\\0 & 0\end{bmatrix}\Dt\big)$, whose generator is nilpotent
+        ($3\times3$ with cube zero), gives the same result after two terms.
+
+  \item With $\Dt = 0.1$ and $\sigma = 1$, \code{scipy.linalg.expm} of $\begin{bmatrix}-F & GQ_cG\T\\ 0 & F\T\end{bmatrix}\Dt$ gives
+        \[
+          \Phi = C_{22}\T = \begin{bmatrix}1 & 0.1\\0 & 1\end{bmatrix}, \qquad
+          Q_d = \Phi C_{12} = \begin{bmatrix}3.333\times10^{-4} & 5\times10^{-3}\\ 5\times10^{-3} & 0.1\end{bmatrix},
+        \]
+        which equals the exact $\sigma^2\begin{bmatrix}\Dt^3/3 & \Dt^2/2\\ \Dt^2/2 & \Dt\end{bmatrix}$ of \cref{ex:double-integrator-qd} to $10^{-18}$.
+
+  \item With $x = (p_1, v_1, p_2, v_2)$, $\Phi = \blkdiag\big(\begin{bmatrix}1 & \Dt\\0 & 1\end{bmatrix}, \begin{bmatrix}1 & \Dt\\0 & 1\end{bmatrix}\big)$ and $H = [1\ \ 0\ \ {-1}\ \ 0]$, the rows
+        of the observability matrix are $H\Phi^k = [1\ \ k\Dt\ \ {-1}\ \ {-k\Dt}]$, which span a two-dimensional space: $\rank\mathcal O = 2$. The unobservable subspace
+        is
+        \[
+          \nullsp(\mathcal O) = \mathrm{span}\{(1, 0, 1, 0),\ (0, 1, 0, 1)\}:
+        \]
+        a common translation and a common velocity of both targets. The relative measurement reveals the relative position and the relative
+        velocity, but nothing about where the pair is or how it moves as a whole: the one-dimensional version of the unobservable global position of
+        VIO.
+
+  \item For $\dot x = Fx$, $z(t) = He^{Ft}x_0$, and the derivatives of the output at $t = 0$ are $z^{(k)}(0) = HF^kx_0$. If $\mathcal O_c = [H;\ HF;\ \dots;\ HF^{n-1}]$ has
+        full column rank, the noise-free output over any interval determines these derivatives and hence $x_0 = (\mathcal O_c\T\mathcal O_c)\inv\mathcal O_c\T
+        (z(0), \dot z(0), \dots)$. Conversely, if $\mathcal O_cx_0 = 0$ for some $x_0 \ne 0$, then $HF^kx_0 = 0$ for $k < n$, and by the Cayley--Hamilton theorem for all
+        $k$, so $z(t) = \sum_k\frac{t^k}{k!}HF^kx_0 = 0$ for all $t$: $x_0$ produces the same output as the zero state, and the system is unobservable.
+
+  \item Let the state be $(\theta, b_g)$ with the gyro reading $\omega_m$ as the known input: $\dot\theta = \omega_m - b_g$, $\dot b_g = 0$, and the inclinometer
+        measures $z = \theta$. Then $F = \begin{bmatrix}0 & -1\\0 & 0\end{bmatrix}$, $H = [1\ \ 0]$, and $\mathcal O = \begin{bmatrix}1 & 0\\0 & -1\end{bmatrix}$ has full rank: the bias is
+        observable, as the slope of the difference between the integrated gyro and the inclinometer. With a second gyroscope instead, the two
+        readings are $\omega + b_1$ and $\omega + b_2$ of the same unknown rate $\omega$. Shifting $\omega \to \omega + c$, $b_1 \to b_1 - c$, $b_2 \to b_2 - c$ leaves both readings
+        unchanged for every $c$, so only the difference $b_1 - b_2$ is observable: neither bias, nor the angle, can be recovered. Observing a bias
+        needs an independent measurement of the quantity the sensor integrates, not another copy of the same sensor.
+\end{solutions}

@@ -1,0 +1,90 @@
+% Solutions to the exercises of Chapter 4.
+\begin{solutions}
+  \item Differentiating each component with respect to $x$ and $y$,
+        \[
+          \frac{\partial f}{\partial(x, y)} = \begin{bmatrix} 2xy & x^2 \\ y\cos(xy) & x\cos(xy) \\ e^x & 0 \end{bmatrix}.
+        \]
+        At $(x, y) = (0.7, -1.3)$ this is $\begin{bmatrix}-1.82 & 0.49\\ -0.798 & 0.430\\ 2.014 & 0\end{bmatrix}$, and the central-difference Jacobian
+        with $h = 10^{-6}$, column $j$ being $\big(f(x + he_j) - f(x - he_j)\big)/2h$, agrees to $10^{-10}$, the accuracy predicted in
+        \cref{sec:numdiff}.
+
+  \item The cubic Taylor term of $\cos$ at $0$ vanishes, so $1 - h^2/2$ is also the degree-3 Taylor polynomial, and \cref{thm:taylor} with $n = 3$
+        gives the remainder $\cos(\xi)\,h^4/4!$. Hence $|\cos h - (1 - h^2/2)| \le h^4/24 \le 4.2\times10^{-6}$ for $|h| \le 0.1$. The bound is tight:
+        at $h = 0.1$ the actual error is $4.165\times10^{-6}$. Using $n = 2$ instead would give the much weaker bound $|h|^3/6 \approx 1.7\times10^{-4}$;
+        knowing which terms vanish pays off.
+
+  \item Expand $f(x) = \|Ax - b\|^2 = x\T A\T Ax - 2b\T Ax + b\T b$. The quadratic-form rule with the symmetric matrix $A\T A$ gives
+        $\nabla(x\T A\T Ax) = 2A\T Ax$, and $\nabla(b\T Ax) = A\T b$, so
+        \[
+          \nabla_xf = 2A\T Ax - 2A\T b = 2A\T(Ax - b), \qquad \nabla^2_xf = \frac{\partial}{\partial x}\big(2A\T Ax - 2A\T b\big) = 2A\T A .
+        \]
+        Setting the gradient to zero gives the normal equations; the Hessian $2A\T A \succeq 0$ shows that any such point is a minimum.
+
+  \item With $a = -2$ and $b = 1$ the integrating-factor formula gives
+        \[
+          x(t) = 3e^{-2t} + \int_0^te^{-2(t-s)}\,\dd s = 3e^{-2t} + \tfrac12\big(1 - e^{-2t}\big) = \tfrac12 + \tfrac52e^{-2t}.
+        \]
+        Check: $\dot x = -5e^{-2t}$ and $-2x + 1 = -1 - 5e^{-2t} + 1 = -5e^{-2t}$; $x(0) = \tfrac12 + \tfrac52 = 3$. The solution decays from 3 to the
+        equilibrium $\tfrac12$ with time constant $\tfrac12$.
+
+  \item $A^2 = -I$, so as in the solution of Exercise 3.7 the series splits into the cosine and sine series:
+        \[
+          e^{At} = \cos t\,I + \sin t\,A = \begin{bmatrix}\cos t & \sin t\\ -\sin t & \cos t\end{bmatrix}.
+        \]
+        This is a rotation by $-t$. The system is $\dot x_1 = x_2$, $\dot x_2 = -x_1$, the harmonic oscillator $\ddot x_1 = -x_1$ with
+        $x_1 = \text{position}$ and $x_2 = \text{velocity}$. Its solutions move clockwise around circles at unit angular rate; $\|x\|^2$, the energy, is
+        conserved. (Euler's method fails to conserve it, \cref{fig:ode-methods}b.)
+
+  \item The second equation gives $x_2(t) = x_2(s)$, and then $\dot x_1 = t\,x_2(s)$ integrates to $x_1(t) = x_1(s) + \tfrac12(t^2 - s^2)x_2(s)$, so
+        \[
+          \Phi(t, s) = \begin{bmatrix}1 & \tfrac12(t^2 - s^2)\\ 0 & 1\end{bmatrix}.
+        \]
+        The matrices do commute: $A(t)A(s) = \begin{bmatrix}0 & t\\0 & 0\end{bmatrix}\begin{bmatrix}0 & s\\0 & 0\end{bmatrix} = 0 = A(s)A(t)$.
+        Accordingly property 4 of \cref{prop:stm} applies: $\int_s^tA = \begin{bmatrix}0 & \frac12(t^2 - s^2)\\0 & 0\end{bmatrix}$ is nilpotent and its
+        exponential is exactly $\Phi(t, s)$.
+
+  \item Profile A: rotate about $x$ at $\pi/2$~rad/s for one second, then about $y$ at $\pi/2$~rad/s for one second. Profile B: the same two
+        segments in the opposite order. Both have $\int\omega\,\dd t = (\pi/2, \pi/2, 0)$. With body rates, $R = R(0)\exp(\cdot)\exp(\cdot)$, so the final
+        rotations are
+        \[
+          R_A = R_x(90^\circ)R_y(90^\circ) = \begin{bmatrix}0 & 0 & 1\\ 1 & 0 & 0\\ 0 & 1 & 0\end{bmatrix}, \qquad
+          R_B = R_y(90^\circ)R_x(90^\circ) = \begin{bmatrix}0 & 1 & 0\\ 0 & 0 & -1\\ -1 & 0 & 0\end{bmatrix},
+        \]
+        both $120^\circ$ rotations but about different axes, $120^\circ$ apart from each other. Neither equals $\exp(\sx{(\pi/2, \pi/2, 0)})$, a
+        $127^\circ$ rotation about $(1, 1, 0)/\sqrt2$. The integral of $\omega$ does not determine the rotation; the order of the rotations does.
+
+  \item The implementation follows the formulas of \cref{sec:numint}, with $f(y) = (y_2, -y_1)$, $y_0 = (1, 0)$, and $N$ steps of $h = 2\pi/N$ over one
+        period:
+\begin{lstlisting}[style=py]
+def step(method, y, h):
+    f = lambda y: np.array([y[1], -y[0]])
+    if method == "Euler": return y + h * f(y)
+    if method == "Heun":
+        k1 = f(y); k2 = f(y + h * k1); return y + h / 2 * (k1 + k2)
+    k1 = f(y); k2 = f(y + h/2 * k1); k3 = f(y + h/2 * k2); k4 = f(y + h * k3)
+    return y + h / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
+\end{lstlisting}
+        The final errors $\|y_N - y_0\|$ for $N = 32, 64, 128, 256$ are $0.84, 0.36, 0.17, 0.080$ (Euler), $4.1\times10^{-2}, 1.0\times10^{-2},
+        2.5\times10^{-3}, 6.3\times10^{-4}$ (Heun) and $7.8\times10^{-5}, 4.9\times10^{-6}, 3.0\times10^{-7}, 1.9\times10^{-8}$ (RK4). The ratios between
+        successive errors give measured orders $\log_2(e_h/e_{h/2}) \approx 1.1$, $2.0$ and $4.0$. Euler approaches order 1 only slowly because its
+        errors are still large: at $N = 32$ the amplitude has already grown by $\big(1 + (2\pi/32)^2\big)^{16} \approx 1.8$.
+
+  \item One Euler step is $R_{k+1} = R_k(I + h\sx{\omega})$, so $\det R_{k+1} = \det R_k\,\det(I + h\sx{\omega})$. The eigenvalues of $\sx{\omega}$ are $0$
+        and $\pm i\|\omega\|$ (Exercise 2.7), so those of $I + h\sx{\omega}$ are $1$ and $1 \pm ih\|\omega\|$, and
+        \[
+          \det(I + h\sx{\omega}) = 1\cdot(1 + ih\|\omega\|)(1 - ih\|\omega\|) = 1 + h^2\|\omega\|^2 .
+        \]
+        The factor is in fact exact, not only leading order. After $n$ steps $\det R = (1 + h^2\|\omega\|^2)^n \approx e^{nh^2\|\omega\|^2}$: at 200~Hz and
+        1~rad/s this is $e^{2.5\times10^{-5}\,n}$, a 2.5\% inflation per thousand steps. The Lie--Euler update $R_k\exp(h\sx{\omega})$ keeps $\det R = 1$ exactly.
+
+  \item Evaluating the two formulas of \cref{sec:numdiff} on a log-spaced grid of $h$ for $f = \sin$ at $x = 1$ reproduces the figure. The theory
+        predicts, with $u = 2^{-53}$, $|f| = \sin1 = 0.84$, $|f''| = 0.84$, $|f'''| = \cos1 = 0.54$:
+        \begin{itemize}[leftmargin=1.2em]
+          \item forward differences: $h^\star = 2\sqrt{u|f|/|f''|} = 2.1\times10^{-8}$, with error $2\sqrt{u|f||f''|} = 1.8\times10^{-8}$;
+          \item central differences: $h^\star = (3u|f|/|f'''|)^{1/3} = 8.0\times10^{-6}$, with error $1.7\times10^{-11}$.
+        \end{itemize}
+        The observed minima (taking the median error in a small window of $h$, since the rounding part is erratic) lie at $h \approx 10^{-8}$ and
+        $5\times10^{-6}$, with errors of about $3\times10^{-9}$ and $3\times10^{-12}$. The optimal steps agree with the formulas to within a factor of
+        two, and the observed errors are a few times smaller than the predicted ones, because the formulas add worst-case rounding errors while
+        the actual rounding errors of $f(x + h)$ and $f(x - h)$ are partly random and partly cancel.
+\end{solutions}

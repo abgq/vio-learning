@@ -1,0 +1,71 @@
+% Solutions to the exercises of Chapter 10.
+\begin{solutions}
+  \item With $F = \tfrac12r\T Wr$ and $W$ symmetric, a small change $\dd x$ changes the residual by $\dd r = J\,\dd x$ and the cost by
+        $\dd F = r\T W\,\dd r = (J\T Wr)\T\dd x$, so $\nabla F = J\T Wr = \sum_k(Wr)_k\nabla r_k$, a combination of the residual gradients. Differentiating this sum
+        by the product rule,
+        \[
+          \dd(\nabla F) = \sum_k\nabla r_k\,(W\,\dd r)_k + \sum_k(Wr)_k\,\nabla^2r_k\,\dd x = \Big(J\T WJ + \sum_k(Wr)_k\nabla^2r_k\Big)\dd x,
+        \]
+        which is \eqref{eq:nlls-derivatives}. The first term needs only first derivatives; the second is weighted by the residuals, which is why
+        Gauss--Newton may drop it when the residuals are small.
+
+  \item The implementation follows \cref{alg:gauss-newton} with $r(a, b) = ae^{-bt} - y$ and Jacobian columns $e^{-bt}$ and $-ate^{-bt}$; LM adds
+        $\lambda\diag(J\T J)$ and adapts $\lambda$ (divide by 10 after a successful step, multiply by 10 after a failed one). On the data of
+        \cref{fig:gn-lm} (25 samples on $[0, 1.5]$~s, $a = 2$, $b = 1.3$, noise $0.04$) both reach $(\hat a, \hat b) = (1.993, 1.293)$ from the figure's start.
+        Starting instead from each point of a grid of $16\times21$ initial guesses with $a_0 \in [-1.75, 5.75]$ and $b_0 \in [-2, 8]$, LM converged from
+        all 336 starts and Gauss--Newton from 237. Typical failures: from $(a_0, b_0) = (0.5, 6)$ the first Gauss--Newton step overshoots to a huge decay
+        rate, after which $e^{-bt} \approx 0$ for all $t > 0$, $J$ becomes rank deficient and the iteration never recovers; from $(1, 4)$ it overflows. LM rejects
+        such steps and shortens them until the cost decreases, which is what makes it the default choice when the initial guess is poor.
+
+  \item Let $x^\star$ be a solution with $r(x^\star) = 0$ and $J^\star = J(x^\star)$ of full column rank, and let $e = x - x^\star$. Taylor expansion gives
+        $r(x) = J^\star e + O(\|e\|^2)$ and $J(x) = J^\star + O(\|e\|)$, hence $r(x) = J(x)\,e + O(\|e\|^2)$. The Gauss--Newton step from $x$ is
+        $\delta = -(J\T WJ)\inv J\T Wr(x) = -e + O(\|e\|^2)$, so the new error is $e + \delta = O(\|e\|^2)$: quadratic convergence. With a non-zero residual
+        $r(x^\star)$ the omitted Hessian term $\sum_k(Wr)_k\nabla^2r_k$ is of the size of the residual, and the convergence is only linear, with a rate that
+        grows with the residual. Fitting the exponential to noise-free data from $(2.3, 1.0)$ gives errors $8\times10^{-2}$, $3\times10^{-3}$, $3\times10^{-6}$,
+        $4\times10^{-12}$: the number of correct digits doubles each time.
+
+  \item With 100 points on $y = 0.5x + 1$ (noise $0.2$) of which 20 are replaced by uniform outliers, and IRLS using the normalized residuals
+        $s_i = |r_i|/\hat\sigma$ with the robust scale $\hat\sigma = 1.4826\,\mathrm{median}|r_i - \mathrm{median}(r)|$:
+        \begin{center}\small
+        \begin{tabular}{@{}l c c@{}}
+        \toprule
+        method & slope & intercept \\
+        \midrule
+        least squares & 0.394 & 1.92 \\
+        Huber IRLS ($c = 1.345$) & 0.489 & 1.04 \\
+        Cauchy IRLS ($c = 2.385$) & 0.495 & 0.98 \\
+        least squares on the inliers only & 0.496 & 0.98 \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        Least squares is dragged far off by the outliers. Huber bounds their influence (each outlier still pulls with constant force $c$) and Cauchy
+        nearly ignores them, matching the fit that knows which points are inliers. The robust scale estimate matters: with the scale computed by a
+        plain standard deviation, which the outliers inflate, both kernels stop at slopes near $0.44$ and intercepts near $1.45$, because the
+        outliers no longer look large enough to be down-weighted.
+
+  \item Build a random problem with the bundle-adjustment structure: 8 ``cameras'' with 6 parameters and 60 ``landmarks'' with 3, each landmark
+        observed by 3 random cameras, each observation contributing a $2\times6$ camera block and a $2\times3$ landmark block to $J$. Then the landmark block $C$
+        of $M = J\T J$ is block diagonal, so $C\inv$ is computed block by block. Solving the reduced system
+        $(A - BC\inv B\T)\,\delta c = g_c - BC\inv g_l$, then back-substituting $\delta l = C\inv(g_l - B\T\delta c)$, matches the direct solve of the full
+        $228\times228$ system to $10^{-13}$. The reduced system is only $48\times48$; for real problems with thousands of landmarks the saving is enormous.
+
+  \item Apply \cref{prop:block-inverse} to $M = \begin{bmatrix}A & B\\ B\T & C\end{bmatrix}$, eliminating the landmark block $C$ (the proposition with the roles of
+        the blocks exchanged, as in Exercise 5.4): the camera block of $M\inv$ is $(M/C)\inv = (A - BC\inv B\T)\inv$. Hence the reduced camera matrix is the
+        inverse of the camera block of $M\inv$ (numerically, to $5\times10^{-14}$ in the example above). Interpretation: at the optimum $M = J\T WJ$ is the
+        information matrix of the estimate and $M\inv$ its covariance. The camera block of the covariance is the marginal covariance of the cameras,
+        and its inverse is their marginal information. The reduced camera system is therefore exactly the information about the cameras after the
+        landmarks have been marginalized out, the same operation that a sliding-window smoother performs when it marginalizes old states.
+
+  \item Iteration $i$ linearizes $h$ at the current iterate $x_i$ (with $x_0 = \mu$), $H_i = \partial h/\partial x|_{x_i}$, and takes a Gauss--Newton step on the MAP
+        cost from $x_i$. Its normal equations are
+        \[
+          \big(P\inv + H_i\T R\inv H_i\big)\,\delta = -P\inv(x_i - \mu) + H_i\T R\inv\big(z - h(x_i)\big).
+        \]
+        Adding $(P\inv + H_i\T R\inv H_i)(x_i - \mu)$ to both sides gives $(P\inv + H_i\T R\inv H_i)(x_{i+1} - \mu) = H_i\T R\inv\big(z - h(x_i) - H_i(\mu - x_i)\big)$, i.e.
+        \[
+          x_{i+1} = \mu + K_i\big(z - h(x_i) - H_i(\mu - x_i)\big), \qquad K_i = PH_i\T\big(H_iPH_i\T + R\big)\inv .
+        \]
+        For $i = 0$, $x_0 = \mu$ and the bracket reduces to $z - h(\mu)$: the first iteration is exactly the EKF update of \cref{prop:ekf-gn}. Later
+        iterations re-linearize the measurement at the improved estimate; the term $-H_i(\mu - x_i)$ keeps the prior anchored at $\mu$, so the iteration
+        minimizes the full MAP cost rather than repeatedly applying the measurement. After the last iteration the covariance is $(I - K_iH_i)P$.
+\end{solutions}

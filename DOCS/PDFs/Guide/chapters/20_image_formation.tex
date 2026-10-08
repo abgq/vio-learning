@@ -107,8 +107,7 @@ $f_u = 458.654$, $f_v = 457.296$, $c_u = 367.215$, $c_v = 248.375$ on a $752\tim
 
 \subsection{Points and lines in the image}
 
-\index{homogeneous coordinates}
-The image point $(x, y)$ corresponds to the whole ray of 3D vectors $\lambda(x, y, 1)$, $\lambda \ne 0$. \term{Homogeneous coordinates} make this explicit: a point of the
+The image point $(x, y)$ corresponds to the whole ray of 3D vectors $\lambda(x, y, 1)$, $\lambda \ne 0$. \termi{Homogeneous coordinates}{homogeneous coordinates} make this explicit: a point of the
 plane is represented by any non-zero 3-vector $\tilde x = (x_1, x_2, x_3)$, with $\tilde x$ and $\lambda\tilde x$ representing the same point, and the ordinary coordinates
 are recovered as $(x_1/x_3, x_2/x_3)$. Vectors with $x_3 = 0$ represent \emph{points at infinity}: directions, where parallel lines meet.
 
@@ -296,3 +295,4 @@ EuRoC is hardware synchronized, so $t_d \approx 0$; consumer devices can have of
   \item A point at depth 10~m is observed by a camera translating sideways at 1~m/s and rotating at 1~rad/s. Which motion dominates its image velocity? What does
         this imply for the observability of translation from distant points?
 \end{exercises}
+\input{chapters/solutions/20_image_formation}

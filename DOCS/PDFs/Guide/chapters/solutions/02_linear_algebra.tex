@@ -1,0 +1,101 @@
+% Solutions to the exercises of Chapter 2.
+\begin{solutions}
+  \item A $3\times3$ matrix $S$ is skew-symmetric when $S\T = -S$. Sums and scalar multiples of skew-symmetric matrices are
+        skew-symmetric, and the zero matrix is one, so they form a subspace of $\R^{3\times3}$. The condition forces $S_{ii} = 0$
+        and $S_{ji} = -S_{ij}$, so $S$ is determined by its three entries $S_{32}, S_{13}, S_{21}$, and these can be chosen
+        freely: the subspace has dimension three, with basis $\sx{e_1}, \sx{e_2}, \sx{e_3}$. The map $a \mapsto \sx{a}$ is linear
+        because each entry of $\sx{a}$ is a linear function of $a$, by \eqref{eq:skew}. It is invertible because the vee map
+        $S \mapsto (S_{32}, S_{13}, S_{21})$ undoes it: $\sx{a}\veeop = a$ and $\sx{S\veeop} = S$. A linear bijection between
+        $\R^3$ and the skew-symmetric matrices confirms again that the dimension is three.
+
+  \item They are dependent: $\det\begin{bmatrix}1 & 4 & 7\\ 2 & 5 & 8\\ 3 & 6 & 9\end{bmatrix} = 0$. Looking for $\alpha(1,2,3) +
+        \beta(4,5,6) + \gamma(7,8,9) = 0$, the differences of consecutive vectors are both $(3, 3, 3)$, so
+        $(4,5,6) - (1,2,3) = (7,8,9) - (4,5,6)$, that is
+        \[
+          (1, 2, 3) - 2\,(4, 5, 6) + (7, 8, 9) = 0 .
+        \]
+        The three vectors lie in a plane through the origin, spanned for example by $(1,2,3)$ and $(1,1,1)$.
+
+  \item With $a_1 = (1,1,0)$, $a_2 = (1,0,1)$, $a_3 = (0,1,1)$:
+        \begin{align*}
+          q_1 &= a_1/\|a_1\| = \tfrac{1}{\sqrt2}(1, 1, 0), \\
+          a_2 - (q_1\T a_2)q_1 &= (1,0,1) - \tfrac12(1,1,0) = \big(\tfrac12, -\tfrac12, 1\big), \qquad q_2 = \tfrac{1}{\sqrt6}(1, -1, 2), \\
+          a_3 - (q_1\T a_3)q_1 - (q_2\T a_3)q_2 &= (0,1,1) - \tfrac12(1,1,0) - \tfrac16(1,-1,2) = \tfrac23(-1, 1, 1), \\
+          q_3 &= \tfrac{1}{\sqrt3}(-1, 1, 1).
+        \end{align*}
+        Check: $q_1\T q_2 = q_1\T q_3 = q_2\T q_3 = 0$, and each has unit length.
+
+  \item Both sides of \eqref{eq:bac-cab} are linear in each of $a$, $b$ and $c$, so it suffices to check them on basis vectors.
+        Both sides are also antisymmetric in $(b, c)$ (swapping $b$ and $c$ flips $b\times c$, and turns $b(a\T c) - c(a\T b)$
+        into its negative), so both vanish when $b = c$, and the case $(b, c) = (e_2, e_1)$ follows from $(e_1, e_2)$.
+        Relabelling the axes cyclically ($e_1 \to e_2 \to e_3 \to e_1$) preserves cross products, so it suffices to take
+        $b = e_1$, $c = e_2$, $b \times c = e_3$, and $a \in \{e_1, e_2, e_3\}$:
+        \begin{align*}
+          a = e_1&:\quad e_1\times e_3 = -e_2, \qquad e_1(e_1\T e_2) - e_2(e_1\T e_1) = -e_2; \\
+          a = e_2&:\quad e_2\times e_3 = e_1, \qquad\ \ e_1(e_2\T e_2) - e_2(e_2\T e_1) = e_1; \\
+          a = e_3&:\quad e_3\times e_3 = 0, \qquad\ \ \ e_1(e_3\T e_2) - e_2(e_3\T e_1) = 0 .
+        \end{align*}
+
+  \item By \eqref{eq:skew-prod}, $\sx{a}\sx{b} = ba\T - (a\T b)I$ and $\sx{b}\sx{a} = ab\T - (b\T a)I$. The identity terms cancel in the
+        difference, so $\sx{a}\sx{b} - \sx{b}\sx{a} = ba\T - ab\T$. Applied to any $c$, using \eqref{eq:bac-cab},
+        \[
+          (ba\T - ab\T)\,c = b\,(a\T c) - a\,(b\T c) = -c \times (a \times b) = (a\times b)\times c = \sx{a\times b}\,c .
+        \]
+        For the Jacobi identity, draw random vectors and evaluate the sum: in double precision it is about $10^{-16}$
+        (rounding level), for example
+\begin{lstlisting}[style=py]
+a, b, c = np.random.default_rng(0).normal(size=(3, 3))
+r = np.cross(a, np.cross(b, c)) + np.cross(b, np.cross(c, a)) + np.cross(c, np.cross(a, b))
+print(np.linalg.norm(r))      # 6.5e-17
+\end{lstlisting}
+        It also follows algebraically from \eqref{eq:bac-cab}: the three terms are $b(a\T c) - c(a\T b)$, $c(b\T a) - a(b\T c)$ and
+        $a(c\T b) - b(c\T a)$, which cancel in pairs.
+
+  \item The reflection keeps the component of $x$ in the plane and flips the component along $n$, which is $nn\T x$:
+        \[
+          H = I - 2nn\T .
+        \]
+        $H$ is symmetric, and $H\T H = H^2 = I - 4nn\T + 4n(n\T n)n\T = I$ because $n\T n = 1$, so $H$ is orthogonal. Its eigenvalues are
+        $-1$ for the eigenvector $n$ and $+1$ for every vector in the plane (a two-dimensional eigenspace), so
+        $\det H = (-1)(1)(1) = -1$: a reflection, not a rotation. (This is the Householder reflection of \cref{ch:numlinalg}.)
+
+  \item The characteristic polynomial of a $3\times3$ matrix is $-\lambda^3 + (\tr S)\lambda^2 - m_2\lambda + \det S$, where $m_2$ is the sum of
+        the three principal $2\times2$ minors. For $S = \sx{a}$: $\tr S = 0$, $\det S = a\T(a \times a) = 0$ (the triple product with a
+        repeated vector), and $m_2 = a_1^2 + a_2^2 + a_3^2$. Hence $p(\lambda) = -\lambda(\lambda^2 + \|a\|^2)$, with roots $0$ and $\pm i\|a\|$.
+        The eigenvector of $0$ is $a$ itself, since $\sx{a}\,a = a \times a = 0$. This matches the geometry of \cref{ch:rotations}:
+        $\sx{a}$ generates rotations about the axis $a$, which leave $a$ fixed, and acts on the plane orthogonal to $a$ as a
+        $90^\circ$ rotation scaled by $\|a\|$.
+
+  \item $\tr A = 4$ and $\det A = 3$, so $\lambda^2 - 4\lambda + 3 = 0$ gives $\lambda_1 = 3$, $\lambda_2 = 1$, with unit eigenvectors
+        $u_1 = (1, 1)/\sqrt2$ and $u_2 = (1, -1)/\sqrt2$. Thus
+        \[
+          A = U\Lambda U\T, \qquad U = \tfrac{1}{\sqrt2}\begin{bmatrix}1 & 1\\ 1 & -1\end{bmatrix}, \qquad \Lambda = \diag(3, 1).
+        \]
+        The ellipse $x\T A\inv x = 1$ reads $y_1^2/3 + y_2^2/1 = 1$ in the coordinates $y = U\T x$: its major semi-axis has length
+        $\sqrt3 \approx 1.73$ along the diagonal $(1, 1)$, and its minor semi-axis has length 1 along $(1, -1)$. It passes through
+        $(\pm1.22, \pm1.22)$ on the diagonal and through $(\pm0.71, \mp0.71)$ on the anti-diagonal.
+
+  \item By the rank--nullity theorem applied to $H_f\T$ (\cref{thm:fundamental}), the left nullspace has dimension
+        $2M - \rank(H_f) = 2M - 3$: one for $M = 2$, three for $M = 3$, and 17 for $M = 10$. These are the numbers of
+        constraints on the poses that one feature contributes in the MSCKF (\cref{ch:msckfupdate}).
+
+  \item The $j$-th column of $ab\T$ is $b_j\,a$. Every column is a multiple of $a$, and since $b \ne 0$ at least one column is a
+        non-zero multiple, so the column space is exactly $\mathrm{span}(a)$ and the rank is one. Conversely, if $M$ has rank one,
+        its column space is a line $\mathrm{span}(a)$ with $a \ne 0$; each column is then $m_j = b_j\,a$ for some scalar $b_j$, which
+        means $M = ab\T$ with $b = (b_1, \dots, b_n)$, and $b \ne 0$ because $M \ne 0$.
+
+  \item $\tr(A\T B) = \sum_j(A\T B)_{jj} = \sum_j\sum_iA_{ij}B_{ij}$ is the ordinary dot product of the matrices viewed as long
+        vectors of their entries. It is therefore symmetric, linear in each argument, and positive definite:
+        $\tr(A\T A) = \sum_{ij}A_{ij}^2 > 0$ unless $A = 0$. This is the definition of an inner product, and the norm it induces is
+        $\|A\|_F^2 = \tr(A\T A) = \sum_{ij}A_{ij}^2$.
+
+  \item If $R_1, R_2 \in \SO$ then $(R_1R_2)\T(R_1R_2) = R_2\T R_1\T R_1R_2 = R_2\T R_2 = I$, and
+        $\det(R_1R_2) = \det R_1\det R_2 = 1$, so $R_1R_2 \in \SO$. In the plane, multiplying out and using the angle-addition
+        formulas,
+        \[
+          R(\alpha)R(\beta) = \begin{bmatrix} c_\alpha c_\beta - s_\alpha s_\beta & -(c_\alpha s_\beta + s_\alpha c_\beta) \\
+                                            s_\alpha c_\beta + c_\alpha s_\beta & c_\alpha c_\beta - s_\alpha s_\beta \end{bmatrix}
+          = \begin{bmatrix} \cos(\alpha+\beta) & -\sin(\alpha+\beta) \\ \sin(\alpha+\beta) & \cos(\alpha+\beta) \end{bmatrix} = R(\alpha + \beta).
+        \]
+        In particular planar rotations commute; in three dimensions they do not (\cref{ch:rotations}).
+\end{solutions}

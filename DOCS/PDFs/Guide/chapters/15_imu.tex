@@ -98,6 +98,7 @@ rotates with angular velocity $\Omega$, then in the sensor frame the mass experi
 For a rotation about the $z$-axis this acceleration points along $y$:
 \begin{equation}
   a_y = -2\,\Omega_z\,A\omega_d\cos(\omega_dt) .
+  \label{eq:gyro-coriolis}
 \end{equation}
 The resulting vibration along $y$ (the \emph{sense} mode) has an amplitude proportional to the rate $\Omega_z$ and oscillates at the drive frequency, so
 the electronics recover $\Omega_z$ by demodulating the sense signal synchronously with the drive. The sensitive axis is perpendicular to both the drive and
@@ -288,3 +289,4 @@ noise-free IMU data from \eqref{eq:imu-model}; adding noise with the discrete eq
   \item A scale-factor error of $s = 10^{-3}$ affects a gyro on a vehicle spinning at 1~rad/s. What equivalent bias does it produce? Why can't a constant-bias model
         absorb it during maneuvers?
 \end{exercises}
+\input{chapters/solutions/15_imu}

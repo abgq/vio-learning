@@ -1,0 +1,56 @@
+% Solutions to the exercises of Chapter 14.
+\begin{solutions}
+  \item With the global perturbation the true attitude is $R = \Exp(\delta\theta)\hat R$ before injection and $R = \Exp(\delta\theta^+)\hat R^+$ after it, with
+        $\hat R^+ = \Exp(\delta\hat\theta)\hat R$. Equating, $\Exp(\delta\theta^+) = \Exp(\delta\theta)\Exp(-\delta\hat\theta)$, and the BCH formula \eqref{eq:bch} gives
+        \[
+          \delta\theta^+ = \delta\theta - \delta\hat\theta - \tfrac12\,\delta\theta\times\delta\hat\theta + \cdots = \delta\theta - \delta\hat\theta + \tfrac12\,\delta\hat\theta\times\delta\theta + \cdots,
+        \]
+        whose derivative with respect to $\delta\theta$ is $G_\theta = I + \tfrac12\sx{\delta\hat\theta}$. The sign is opposite to the local case
+        (\cref{prop:reset}), because the correction now multiplies on the left. (Exactly, the derivative at $\delta\theta = \delta\hat\theta$ is $\Jl(\delta\hat\theta)$.)
+
+  \item Here $\sx{\delta\hat\theta}$ mixes only $x$ and $y$, and $P_{\theta\theta}$ is isotropic in that plane, so both products stay diagonal:
+        \begin{align*}
+          GP_{\theta\theta}G\T &= \diag\big(1.0025,\ 1.0025,\ 100\big)\times10^{-4}, \\
+          \Jr P_{\theta\theta}\Jr\T &= \diag\big(0.9992,\ 0.9992,\ 100\big)\times10^{-4}.
+        \end{align*}
+        The difference, $0.33\%$ of the $x$ and $y$ variances, is second order: $G$ and $\Jr(\delta\hat\theta) = I - \tfrac12\sx{\delta\hat\theta} + O(\|\delta\hat\theta\|^2)$ agree to
+        first order, and their products differ by about $\|\delta\hat\theta\|^2/3$. For anisotropic covariances the first-order rotation of the covariance is the
+        same in both, and the relative difference is about $3\times10^{-6}$, $3\times10^{-4}$, $3\%$ and $40\%$ for corrections of $0.003$, $0.03$, $0.3$ and $1$~rad. It
+        is negligible for the milliradian corrections of a running filter and noticeable only after very large corrections, such as the first updates
+        after a poor initialization.
+
+  \item Let $\delta x$ be the error-state variable with prior $\N(0, P)$ in the tangent space at $\hat x$, and $r(\delta x) = z\bminus h(\hat x\bplus\delta x)$, so that the MAP
+        cost is $F(\delta x) = \|\delta x\|^2_{P\inv} + \|r(\delta x)\|^2_{R_z\inv}$. Near an iterate $\delta x_i$, $r(\delta x) \approx r_i - H_i(\delta x - \delta x_i)$ with $r_i = r(\delta x_i)$ and $H_i$ the
+        manifold Jacobian of $h$ at $\hat x\bplus\delta x_i$. Minimizing the resulting quadratic gives the Gauss--Newton iterate (the algebra of Exercise 10.7 with
+        $\mu = 0$)
+        \[
+          \delta x_{i+1} = K_i\big(r_i + H_i\,\delta x_i\big), \qquad K_i = PH_i\T\big(H_iPH_i\T + R_z\big)\inv .
+        \]
+        From $\delta x_0 = 0$ the first iterate is $\delta x_1 = K_0r(0)$ with $H_0$ evaluated at $\hat x$: exactly the ESKF update $\delta\hat x = Kr$. One ESKF update is
+        therefore one Gauss--Newton step on the MAP cost; the iterated ESKF re-evaluates $h$ and $H$ at $\hat x\bplus\delta x_i$ and repeats, then injects the final
+        $\delta x$ and resets once.
+
+  \item The code of \cref{fig:ahrs} is \code{fig\_ahrs} in \code{scripts/figures\_extra.py}. With the tumbling motion all three bias errors converge,
+        ending with standard deviations of about $8\times10^{-4}$~rad/s and errors within them. Holding the device still and level (zero rate) instead, the
+        two horizontal components still converge ($\sigma \approx 6.5\times10^{-4}$~rad/s, errors consistent with it), but the vertical component, along the measured
+        gravity, does not: its error stays near its initial $0.01$~rad/s. A bias about the vertical integrates into a yaw error, and an inclinometer
+        cannot see yaw; to first order that bias is unobservable. Under rotation, every body axis is horizontal at some time, and a bias about a
+        horizontal axis produces a tilt that the accelerometer does see. (The filter's own $\sigma$ for the vertical component nevertheless shrinks to about
+        $0.004$~rad/s, so its error sits near $2.7\sigma$. With the bias unobservable the yaw estimate drifts far from the truth, $0.3$~rad in a minute, and
+        Jacobians evaluated at that drifting estimate inject information the data do not contain. Evaluated at the true attitude, the same filter's
+        error is consistent with its $\sigma$. This is a first encounter with the mechanism analyzed in \cref{ch:observability}.)
+
+  \item \ifsolutions
+        With $R = \hat R\Exp(\delta\theta)$, $\hat\omega = \omega_m - \hat b$ and $\omega = \omega_m - b - n_g = \hat\omega - \delta b - n_g$, \cref{lem:dexp} applied to
+        $\dot R = R\sx{\omega}$ gives, to first order, $\dot{\delta\theta} = -\sx{\hat\omega}\delta\theta - \delta b - n_g$; and $\dot{\delta b} = n_b$. Hence
+        \[
+          F_c = \begin{bmatrix}-\sx{\hat\omega} & -I\\ 0 & 0\end{bmatrix}, \qquad G_c = \begin{bmatrix}-I & 0\\ 0 & I\end{bmatrix}.
+        \]
+        For the inclinometer, $h = R\T v$, and the inverse-action row of \cref{tab:jacobians} gives
+        \[
+          h(\hat R\Exp(\delta\theta)) \approx \hat R\T v + \sx{\hat R\T v}\,\delta\theta, \qquad\text{so}\qquad H = \big[\sx{\hat R\T v}\ \ 0\big].
+        \] The reset is $G = \blkdiag\big(I - \tfrac12\sx{\delta\hat\theta},\ I\big)$ (\cref{prop:reset}). Compared with the global version of
+        \cref{sec:ahrs}, the heading-dependent $\hat R$ has disappeared from $F_c$ and $G_c$ and moved into $H$, and the error is coupled to the rotation through
+        $-\sx{\hat\omega}$: a body-frame error appears to rotate backwards as the body turns. These are exactly the attitude rows of the project's $F_c$ and $G_c$.
+        \else\withheldsolution\fi
+\end{solutions}

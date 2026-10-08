@@ -79,6 +79,8 @@
 \usepackage{placeins}
 \usepackage{siunitx}
 \sisetup{per-mode=symbol, range-phrase=--, group-digits=integer}
+% newpxtext has no text-mode micro sign (\textmu would fall back to a bitmap Computer Modern glyph); use newpxmath's upright mu
+\DeclareSIPrefix{\micro}{\ensuremath{\upmu}}{-6}
 
 % -------------------------------------------------------------------- code
 \usepackage{listings}
@@ -116,18 +118,19 @@
 
 % ------------------------------------------------------- headings & headers
 \usepackage{titlesec}
+% Headings are set ragged right and never hyphenated.
 \titleformat{\chapter}[display]
-  {\normalfont\color{primary}}
+  {\normalfont\color{primary}\raggedright\hyphenpenalty=10000}
   {\large\scshape\chaptertitlename\ \thechapter}
   {6pt}
   {\Huge\bfseries}
   [\vspace{3pt}{\color{primary}\titlerule[1.2pt]}]
 \titlespacing*{\chapter}{0pt}{-10pt}{26pt}
-\titleformat{\section}{\normalfont\Large\bfseries\color{primary}}{\thesection}{0.8em}{}
-\titleformat{\subsection}{\normalfont\large\bfseries\color{primary!85!black}}{\thesubsection}{0.8em}{}
+\titleformat{\section}{\normalfont\Large\bfseries\color{primary}\raggedright\hyphenpenalty=10000}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries\color{primary!85!black}\raggedright\hyphenpenalty=10000}{\thesubsection}{0.8em}{}
 \titleformat{\subsubsection}{\normalfont\normalsize\bfseries}{\thesubsubsection}{0.8em}{}
 \titleformat{\part}[display]
-  {\centering\normalfont\color{primary}}
+  {\centering\normalfont\color{primary}\hyphenpenalty=10000}
   {\LARGE\scshape Part \thepart}
   {14pt}
   {\Huge\bfseries}
@@ -254,12 +257,28 @@
     \ifsolutions Worked solution: \cref{#2} (page~\pageref{#2}).\else
     The worked solution is omitted from this edition; build without \texttt{NoSolutions} to include it.\fi}}
 
-% Exercise lists at chapter ends
+% Exercise lists at chapter ends, and their worked solutions on the following pages.
+% Each exercise number links to its solution and each solution number links back.
 \newcounter{exercisectr}[chapter]
 \newenvironment{exercises}{%
-  \section*{Exercises}\addcontentsline{toc}{section}{Exercises}%
-  \begin{enumerate}[label={\color{primary}\bfseries\thechapter.\arabic*}, leftmargin=2.6em, itemsep=0.55em]}%
+  \section*{Exercises}\addcontentsline{toc}{section}{Exercises}\markright{Exercises}%
+  \begin{enumerate}[label={\protect\hypertarget{ex.\thechapter.\arabic*}{}%
+      \protect\hyperlink{sol.\thechapter.\arabic*}{\color{primary}\bfseries\thechapter.\arabic*}},
+    leftmargin=2.6em, itemsep=0.55em]}%
   {\end{enumerate}}
+\newenvironment{solutions}{%
+  \clearpage
+  \section*{Solutions to the exercises}\addcontentsline{toc}{section}{Solutions to the exercises}%
+  \markright{Solutions to the exercises}%
+  \begin{enumerate}[label={\protect\hypertarget{sol.\thechapter.\arabic*}{}%
+      \protect\hyperlink{ex.\thechapter.\arabic*}{\color{primary}\bfseries\thechapter.\arabic*}},
+    leftmargin=2.6em, itemsep=0.9em]}%
+  {\end{enumerate}}
+% A solution that would reveal part of a project Jacobian (AGENTS.md Guardrail 4) is printed only
+% in the solutions edition: \item \ifsolutions <solution> \else \withheldsolution \fi
+\newcommand{\withheldsolution}{\textit{This solution contains part of a project Jacobian (AGENTS.md Guardrail 4)
+  and is omitted from this edition. The finite-difference test of the corresponding derivation exercise tells you
+  whether your own answer is right.}}
 
 % ------------------------------------------------------------------ notation
 \newcommand{\R}{\mathbb{R}}

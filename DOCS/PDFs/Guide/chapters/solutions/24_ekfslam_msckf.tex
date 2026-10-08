@@ -1,0 +1,29 @@
+% Solutions to the exercises of Chapter 24.
+\begin{solutions}
+  \item \emph{EKF-SLAM, 200 landmarks:} $n = 15 + 600 = 615$, so $P$ has $378\,225$ entries, 3.0~MB in double precision. One image observation has a Jacobian with 18
+        non-zero columns, so $PH\T$ costs about $2\cdot615\cdot18\cdot2 \approx 44$~kflop, but the covariance update $P - KSK\T$ touches every entry, about $4n^2 \approx 1.5$~Mflop. With 100
+        observations per frame this is about 160~Mflop per frame, 3~Gflop/s at 20~Hz, and it grows with the square of the map. (A dense Joseph form, $\approx 4n^3$, would cost
+        almost 1~Gflop per update.) \emph{MSCKF, 10 clones:} $n = 75$, so $P$ has 5\,625 entries, 45~kB, small enough to stay in cache. An update with 50 features of 6
+        observations stacks $50\cdot(12 - 3) = 450$ rows after nullspace projection (about $0.3$~Mflop for the projections). QR compression to 75 rows costs about $4.8$~Mflop,
+        and the EKF update with 75 rows, Joseph form included, about 6~Mflop: roughly 11~Mflop per update. The memory is 70 times smaller and the flops more
+        than ten times fewer. More importantly, the MSCKF's cost does not depend on how many features are being tracked, only on how many are processed.
+
+  \item The $2M$ scalar observations involve the 3 unknown coordinates of the feature, so after eliminating the feature $2M - 3$ constraints remain on the poses.
+        With $M = 1$ there are none: the two numbers do not even determine the feature, whose depth stays free. With $M = 2$ there is one, the epipolar
+        (coplanarity) constraint between the two poses (Exercise~26.3). Each further view adds two. The project requires $M \ge 3$ because a two-view track is a weak and
+        fragile measurement. Its triangulation rests on the baseline between two consecutive images, often a few centimeters, so the linearization point
+        is poor. Its single projected residual gives the $\chi^2$ gate one degree of freedom, too little to reject a bad match. And the track has no redundancy
+        with which to check the triangulation itself. The information it would contribute is small, and the risk is not.
+
+  \item The past estimate $\hat x_1$ and the current estimate $\hat x_2$ were produced by the same propagation from the same measurements, so their errors are correlated. Treating
+        $\hat x_1$ as exact turns a \emph{relative} measurement into an \emph{absolute} one, credited with an accuracy the anchor does not have. Scalar example: $x_1 \sim \N(\hat x_1, \sigma_1^2)$,
+        $x_2 = x_1 + w$ with $w \sim \N(0, q)$, and $z = x_2 - x_1 + v$ with $v \sim \N(0, r)$; take $\sigma_1^2 = q = r = 1$.
+        \begin{itemize}
+          \item \emph{Correct (cloning):} $x_1$ is kept as a state, $H = [-1\ \ 1]$, and the posterior covariance of $(x_1, x_2)$ is $\big[\begin{smallmatrix} 1 & 1 \\ 1 & 1.5\end{smallmatrix}\big]$.
+                The variance of $x_2$ drops from 2 to 1.5, and that of $x_1$ is unchanged.
+          \item \emph{Wrong:} $z + \hat x_1$ is used as a measurement of $x_2$ with variance $r$. The filter claims $\Var(x_2) = 2\cdot1/3 = 0.67$, but the actual error
+                variance is $\sigma_1^2 + (1 - K)^2q + K^2r = 1.56$ with $K = \tfrac23$ (a Monte Carlo agrees): overconfident by a factor 2.3, and less accurate than the correct filter.
+        \end{itemize}
+        Repeating such anchored updates makes it worse: after 20 steps the claimed variance has settled at $0.62$ while the actual error variance has grown to
+        11.6, like a random walk. The filter believes it is localized when it is drifting.
+\end{solutions}

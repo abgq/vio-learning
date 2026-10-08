@@ -1,0 +1,82 @@
+% Solutions to the exercises of Chapter 20.
+\begin{solutions}
+  \item From $1/z_i = 1/f_L - 1/z_o$, $z_i = f_Lz_o/(z_o - f_L) = 4\cdot500/496$~mm $= 4.0323$~mm: the sensor must move \SI{32}{\micro\metre} away from the lens.
+        To first order the shift is $f_L^2/z_o$, so it shrinks with the square of the focal length. If the sensor is left at $f_L$, the light from the point
+        converges \SI{32}{\micro\metre} behind it, and an aperture of diameter $D$ produces a blur spot of diameter $D(z_i - f_L)/z_i$ on the sensor. For an f/2
+        lens ($D = 2$~mm) this is \SI{16}{\micro\metre}, under three pixels of \SI{6}{\micro\metre}. Short focal lengths give a large depth of field, which is why small
+        fixed-focus cameras stay nearly sharp over a wide range of distances.
+
+  \item The principal point is not at the image center, so add the angles from the optical axis to the two opposite edges, measured along the row and
+        the column through $(c_u, c_v)$. Without distortion the left and right edges are at normalized $x = -367.7/458.65$ and $384.3/458.65$, at
+        $38.7^\circ$ and $40.0^\circ$ from the axis; the top and bottom edges are at $28.6^\circ$ and $26.8^\circ$. With distortion, the edge pixels must first be
+        undistorted (Exercise~5): the middle of the left edge, distorted coordinate $x_d = -0.80$, is the image of a ray with $x = -1.02$, at $45.6^\circ$. Altogether:
+        \begin{center}\small
+        \begin{tabular}{@{}l c c c@{}}
+        \toprule
+        & horizontal & vertical & diagonal \\
+        \midrule
+        pinhole only, $2\arctan(W/2f_u)$ & $78.7^\circ$ & $55.4^\circ$ & $88.4^\circ$ \\
+        with distortion & $93.1^\circ$ & $59.7^\circ$ & $106.2^\circ$ \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        Barrel distortion compresses the periphery onto the sensor, so the camera sees $14^\circ$ more horizontally than its focal length suggests; the image
+        corners look along rays $53^\circ$ off the axis, not $44^\circ$.
+
+  \item The lines are $l_1 = (1, 1, -1)$ and $l_2 = (1, -1, 0)$, and $l_1\times l_2 = (-1, -1, -2) \sim (\tfrac12, \tfrac12, 1)$: the intersection is $(\tfrac12, \tfrac12)$, which
+        satisfies both equations. The line through the points is $(1, 2, 1)\times(3, 1, 1) = (1, 2, -5)$, i.e.\ $x + 2y = 5$; both points satisfy it.
+
+  \item For parallel lines $(a, b, c_1)$ and $(a, b, c_2)$, $c_1 \ne c_2$,
+        \[
+          (a, b, c_1)\times(a, b, c_2) = \big(b(c_2 - c_1),\ a(c_1 - c_2),\ 0\big) = (c_2 - c_1)\,(b, -a, 0),
+        \]
+        a point with third coordinate zero, i.e.\ at infinity, in the direction $(b, -a)$ of the lines themselves (their normal is $(a, b)$). For the 3D lines
+        $X(\lambda) = X_0 + \lambda d$, the camera $P = K[I\ \ 0]$ gives the image $K(X_0 + \lambda d) \sim K(X_0/\lambda + d)$, which tends to
+        \[
+          \tilde v = Kd \qquad (\lambda\to\infty),
+        \]
+        independently of $X_0$: all lines of the family pass through this vanishing point, at pixel $(f_ud_x/d_z + c_u,\ f_vd_y/d_z + c_v)$ for zero skew. If $d_z = 0$ (lines
+        parallel to the image plane), $Kd$ has third coordinate zero and the image lines stay parallel. The vanishing points of all directions in a plane with
+        normal $n$ lie on the line $K\mT n$, the plane's horizon, since $(K\mT n)\T Kd = n\T d = 0$.
+
+  \item Distortion and the fixed-point iteration are the formulas of \cref{sec:distortion}. For Gauss--Newton,
+        solve $f(x) = x_d$ with the $2\times2$ Jacobian $J_f$ of the distortion: $x \gets x - J_f\inv\big(f(x) - x_d\big)$ (with as many equations as unknowns, this is
+        Newton's method). Measuring the error against a fully converged solution, in normalized units ($10^{-6}$ is $5\times10^{-4}$~px):
+        \begin{center}\small
+        \begin{tabular}{@{}l c c c@{}}
+        \toprule
+        pixel & contraction factor & fixed point & Gauss--Newton \\
+        \midrule
+        the four image corners & $0.03$--$0.17$ & 5--8 iterations & 2--3 iterations \\
+        middle of left edge, $(0, c_v)$ & $0.34$ & 12 iterations & 3 iterations \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        The fixed-point error falls by a constant factor per iteration. For radial distortion this factor is $|2k_1r^2 + 4k_2r^4|/(1 + k_1r^2 + k_2r^4)$, which peaks at
+        $0.34$ for $r \approx 1$: the hardest point is the middle of the left and right edges, not the corners, where the $k_2$ term flattens the
+        distortion curve. Gauss--Newton converges quadratically (errors $10^{-2}, 10^{-4}, 10^{-8}$ at a corner), and each iteration costs only a few more
+        operations. A practical warning: OpenCV's \code{cv::undistortPoints} stops after five iterations unless it is given termination criteria, which
+        leaves an error of about $1.1\times10^{-3}$, half a pixel, at the middle of the left edge. Milestone 8's round-trip test catches this.
+
+  \item The homography is $H = [h_1\ h_2\ h_3] = \lambda K[r_1\ r_2\ t]$ for an unknown scale $\lambda$, so $r_1 = \lambda\inv K\inv h_1$ and $r_2 = \lambda\inv K\inv h_2$. The columns of a
+        rotation are orthonormal:
+        \[
+          r_1\T r_2 = 0 \;\Rightarrow\; h_1\T K\mT K\inv h_2 = h_1\T\omega h_2 = 0, \qquad
+          r_1\T r_1 = r_2\T r_2 \;\Rightarrow\; h_1\T\omega h_1 = h_2\T\omega h_2 .
+        \]
+        The unknown $\lambda$ cancels in both; the unit-norm condition itself cannot be used, because it would involve $\lambda$. Each equation is linear in the six
+        distinct entries $b = (\omega_{11}, \omega_{12}, \omega_{22}, \omega_{13}, \omega_{23}, \omega_{33})$: $h_i\T\omega h_j = v_{ij}\T b$ with
+        \[
+          v_{ij} = \big(h_{i1}h_{j1},\ h_{i1}h_{j2} + h_{i2}h_{j1},\ h_{i2}h_{j2},\ h_{i3}h_{j1} + h_{i1}h_{j3},\ h_{i3}h_{j2} + h_{i2}h_{j3},\ h_{i3}h_{j3}\big).
+        \]
+        Each image contributes the rows
+        $v_{12}\T$ and $(v_{11} - v_{22})\T$, and $b$ is the null vector of the stacked matrix (the smallest right singular vector), determined up to scale. Since
+        $\omega$ has five degrees of freedom up to scale, three images in general position suffice. Then $\omega = K\mT K\inv = LL\T$ with $L = K\mT$ lower
+        triangular, so the Cholesky factor of $\omega$ (sign and scale fixed so that $\omega \succ 0$) gives $K = L\mT$, normalized to $K_{33} = 1$.
+
+  \item Translation at speed $v$ perpendicular to the ray moves the image at $v/Z = 0.1$~rad/s, about 46~px/s. Rotation at $\omega$ about the camera's $y$-axis moves a point at image position $x$ at $\omega(1 + x^2) \ge \omega =
+        1$~rad/s, 460~px/s, independent of depth. Rotation dominates by a factor of ten. The translational signal of a point scales as $1/Z$, so distant points
+        constrain translation weakly and points at infinity not at all, while they constrain rotation as well as near points do. Worse, a rotation error of
+        $\delta\omega$ produces the same image motion as a velocity error of $Z\,\delta\omega$: a gyroscope-rate error of $0.01$~rad/s mimics $0.1$~m/s at 10~m. Estimating
+        translation from distant points therefore requires the rotation to be known very accurately, which is exactly what the gyroscope provides in VIO.
+\end{solutions}

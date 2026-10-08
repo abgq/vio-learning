@@ -1,0 +1,106 @@
+% Solutions to the exercises of Chapter 7.
+\begin{solutions}
+  \item Write $R = [r_1\ r_2\ r_3]$. The entry $(i, j)$ of $R\T R = I$ is $r_i\T r_j = \delta_{ij}$: the columns are orthonormal. The unit vectors orthogonal
+        to both $r_1$ and $r_2$ are exactly $\pm r_1\times r_2$ (a unit vector, by Lagrange's identity), so $r_3 = \pm r_1\times r_2$. The determinant is the
+        triple product $\det R = r_3\T(r_1\times r_2) = \pm\|r_1\times r_2\|^2 = \pm1$, so $\det R = +1$ selects $r_3 = r_1\times r_2$: the body axes form a
+        right-handed frame.
+
+  \item From the elementary matrices,
+        \[
+          R_x(90^\circ)R_y(90^\circ) = \begin{bmatrix}0 & 0 & 1\\ 1 & 0 & 0\\ 0 & 1 & 0\end{bmatrix}, \qquad
+          R_y(90^\circ)R_x(90^\circ) = \begin{bmatrix}0 & 1 & 0\\ 0 & 0 & -1\\ -1 & 0 & 0\end{bmatrix}.
+        \]
+        The first sends $e_x \to e_y$, $e_y \to e_z$, $e_z \to e_x$ (its columns): it cycles the axes, a $120^\circ$ rotation about $(1,1,1)/\sqrt3$. The
+        second has trace 0 (angle $120^\circ$) and $(R - R\T)\veeop = (1, 1, -1)$, so it is a $120^\circ$ rotation about $(1, 1, -1)/\sqrt3$. Physically, read
+        as intrinsic sequences: the first turns a book $90^\circ$ about its $x$-axis and then $90^\circ$ about its new $y$-axis; the second does the two
+        quarter turns in the other order and leaves the book in a different orientation.
+
+  \item Write $R = R_zR_yR_x$ with $\dot R_z = \dot\psi R_z\sx{e_z}$, $\dot R_y = \dot\vartheta R_y\sx{e_y}$, $\dot R_x = \dot\varphi R_x\sx{e_x}$. Then
+        \[
+          R\T\dot R = \dot\psi\,R_x\T R_y\T\sx{e_z}R_yR_x + \dot\vartheta\,R_x\T\sx{e_y}R_x + \dot\varphi\,\sx{e_x}
+          = \big[\dot\psi\,R_x\T R_y\T e_z + \dot\vartheta\,R_x\T e_y + \dot\varphi\,e_x\big]_\times
+        \]
+        by \eqref{eq:skew-rot}. With $R_y\T e_z = (-s_\vartheta, 0, c_\vartheta)$, $R_x\T(-s_\vartheta, 0, c_\vartheta) = (-s_\vartheta, s_\varphi c_\vartheta, c_\varphi c_\vartheta)$ and
+        $R_x\T e_y = (0, c_\varphi, -s_\varphi)$,
+        \[
+          \omega_b = \begin{bmatrix} 1 & 0 & -s_\vartheta \\ 0 & c_\varphi & s_\varphi c_\vartheta \\ 0 & -s_\varphi & c_\varphi c_\vartheta \end{bmatrix}
+                     \begin{bmatrix}\dot\varphi\\ \dot\vartheta\\ \dot\psi\end{bmatrix}.
+        \]
+        The matrix has determinant $c_\vartheta$. Solving the last two rows gives $\dot\vartheta = c_\varphi\omega_y - s_\varphi\omega_z$ and
+        $\dot\psi = (s_\varphi\omega_y + c_\varphi\omega_z)/c_\vartheta$, and the first row gives $\dot\varphi = \omega_x + s_\vartheta\dot\psi$, which is \eqref{eq:euler-rates}.
+        The determinant $c_\vartheta$ vanishes at $\vartheta = \pm90^\circ$: gimbal lock.
+
+  \item The rotation is the axis-cycling matrix of Exercise 7.2, $R = \begin{bmatrix}0 & 0 & 1\\ 1 & 0 & 0\\ 0 & 1 & 0\end{bmatrix}$. With the conversion formulas,
+        $\vartheta = \atantwo(-R_{31}, \sqrt{R_{11}^2 + R_{21}^2}) = \atantwo(0, 1) = 0$, $\varphi = \atantwo(R_{32}, R_{33}) = \atantwo(1, 0) = 90^\circ$ and
+        $\psi = \atantwo(R_{21}, R_{11}) = \atantwo(1, 0) = 90^\circ$: yaw $90^\circ$, pitch $0$, roll $90^\circ$. Check: $R_z(90^\circ)R_x(90^\circ)$ reproduces $R$, as the worked
+        example $q_z\qprod q_x$ already showed.
+
+  \item Apply both sides to an arbitrary quaternion $r$. By definition $[q]_Rr = r\qprod q$ and $[p]_Lr = p\qprod r$, so
+        \[
+          [p]_L[q]_R\,r = p\qprod(r\qprod q), \qquad [q]_R[p]_L\,r = (p\qprod r)\qprod q .
+        \]
+        The two agree for every $r$ exactly because the Hamilton product is associative, so the matrices are equal. (Multiplying out the blocks and
+        using $\sx{a}\sx{b} = ba\T - (a\T b)I$ confirms it directly.) Conversely, the identity $[p]_L[q]_R = [q]_R[p]_L$ for all $p, q$ \emph{is} the
+        statement of associativity: multiplying on the left and on the right are commuting operations.
+
+  \item $R(q)$ in \eqref{eq:quat-to-rot} is a homogeneous quadratic in the components of $q$, so $R(-q) = (-1)^2R(q) = R(q)$. A $270^\circ$ rotation about
+        $z$ has
+        \[
+          q = \big[\cos135^\circ,\ \sin135^\circ e_z\big] = \big[-\tfrac{\sqrt2}{2},\ (0, 0, \tfrac{\sqrt2}{2})\big].
+        \]
+        Its scalar part is negative, so the canonical form is $-q = [\tfrac{\sqrt2}{2},\ (0, 0, -\tfrac{\sqrt2}{2})]$. It describes a rotation by
+        $2\arccos(\tfrac{\sqrt2}2) = 90^\circ$ about $-e_z$: the same rotation as $270^\circ$ about $+e_z$, reached the short way round. Canonicalization
+        always yields an angle in $[0, \pi]$.
+
+  \item A direct implementation picks the largest of the four squared components, computed from the diagonal:
+\begin{lstlisting}[style=py]
+def shepperd(R):
+    t = np.trace(R)
+    c = [1 + t, 1 + R[0,0] - R[1,1] - R[2,2], 1 - R[0,0] + R[1,1] - R[2,2], 1 - R[0,0] - R[1,1] + R[2,2]]
+    i = int(np.argmax(c)); s = 2 * np.sqrt(c[i])          # s = 4 * (largest component)
+    a, b, d = R[2,1] - R[1,2], R[0,2] - R[2,0], R[1,0] - R[0,1]   # 4wx, 4wy, 4wz
+    e, f, g = R[0,1] + R[1,0], R[0,2] + R[2,0], R[1,2] + R[2,1]   # 4xy, 4xz, 4yz
+    q = [[s/4, a/s, b/s, d/s], [a/s, s/4, e/s, f/s], [b/s, e/s, s/4, g/s], [d/s, f/s, g/s, s/4]][i]
+    return np.array(q) if q[0] >= 0 else -np.array(q)
+\end{lstlisting}
+        Testing against the quaternion used to build each matrix (axis $(1, -2, 0.5)/\|\cdot\|$) gives errors of $0$, $3\times10^{-16}$, $2\times10^{-18}$ and
+        $10^{-16}$ at $0^\circ$, $90^\circ$, $179.9999^\circ$ and $180^\circ$. The naive formula $w = \tfrac12\sqrt{1 + \tr R}$, $v = (R - R\T)\veeop/4w$ is exact at the first two,
+        wrong by $9\times10^{-6}$ at $179.9999^\circ$ (it divides by $w \approx 9\times10^{-7}$, computed from the difference $1 + \tr R \approx 3\times10^{-12}$), and
+        undefined at $180^\circ$.
+
+  \item The ground-truth row is \code{timestamp, p\_x, p\_y, p\_z, q\_w, q\_x, q\_y, q\_z, v\_x, v\_y, v\_z, bw\_x, bw\_y, bw\_z, ba\_x, ba\_y, ba\_z} (AGENTS.md C7).
+        In C++ the parser constructs each piece explicitly:
+\begin{lstlisting}
+p_wb = Eigen::Vector3d(r[1], r[2], r[3]);
+q_wb = Eigen::Quaterniond(r[4], r[5], r[6], r[7]).normalized();  // w first
+v_wb = Eigen::Vector3d(r[8], r[9], r[10]);
+b_g  = Eigen::Vector3d(r[11], r[12], r[13]);   // gyro bias comes first
+b_a  = Eigen::Vector3d(r[14], r[15], r[16]);
+\end{lstlisting}
+        A good fixture row makes every plausible mistake produce a detectably different result: all quaternion components distinct and of
+        different signs, e.g.\ $q = (w, x, y, z) = (0.8, 0.2, -0.4, 0.4)$ (unit norm), so that reading it as $[x, y, z, w]$ gives a different rotation;
+        biases of different magnitudes and signs, e.g.\ $b_g = (0.01, 0.02, 0.03)$ and $b_a = (-0.1, -0.2, -0.3)$, so that swapping them is visible;
+        and position and velocity that differ in every component. The test asserts each field and also checks that $R(q)\,e_x$ equals the column
+        computed by hand, which catches a wrong constructor order even when the norm is unchanged. A row with the identity quaternion, or with
+        equal biases, would let all these bugs pass.
+
+  \item The optical axis is the camera's $z$-axis; in body coordinates it is $R_{bc}e_z$, the third column of the rotation block of $T_{bc}$. With the
+        values of \cref{app:euroc} it is $(0.0041, 0.0257, 0.9997)$: the camera looks along the body $+z$-axis, tilted by $\arccos(0.9997) = 1.5^\circ$. The
+        other columns show the camera $x$-axis along body $+y$ and the camera $y$-axis along body $-x$; since the EuRoC IMU's $x$-axis points up at
+        rest, the image $y$-axis (rows, increasing downwards) indeed points down.
+
+  \item By \cref{prop:stm} the formula holds only if the matrices $\sx{\omega_b(t)}$ commute for all $t$, i.e.\ if $\omega_b(t)$ keeps a fixed direction. Counterexample:
+        $\omega_b = (\pi/2, 0, 0)$ on $[0, 1)$ and $(0, \pi/2, 0)$ on $[1, 2)$. By \cref{prop:const-rate} applied to each segment the true attitude is
+        $R(2) = R(0)R_x(90^\circ)R_y(90^\circ)$, a $120^\circ$ rotation relative to $R(0)$ (Exercise 7.2). The formula gives
+        $R(0)\exp(\sx{(\pi/2, \pi/2, 0)})$, a $127^\circ$ rotation about $(1, 1, 0)/\sqrt2$, which is wrong by $1.1$~rad. This is the coning error in its
+        crudest form (\cref{sec:coning}).
+
+  \item Let $r_I = Rr$ be the particle's position in inertial coordinates, with $\dot R = R\sx{\Omega}$ and $\Omega$ constant. The transport theorem gives
+        $\dot r_I = R(\dot r + \Omega\times r) = Ru$ with $u = \dot r + \Omega\times r$. Applying it again to $u$,
+        \[
+          \ddot r_I = R(\dot u + \Omega\times u) = R\big(\ddot r + \Omega\times\dot r + \Omega\times\dot r + \Omega\times(\Omega\times r)\big),
+        \]
+        using $\dot\Omega = 0$. Expressed in rotating coordinates ($R\T\ddot r_I$), the inertial acceleration is
+        $\ddot r + 2\,\Omega\times\dot r + \Omega\times(\Omega\times r)$, which is \eqref{eq:coriolis}. The factor 2 comes from the two applications, each contributing
+        one $\Omega\times\dot r$.
+\end{solutions}

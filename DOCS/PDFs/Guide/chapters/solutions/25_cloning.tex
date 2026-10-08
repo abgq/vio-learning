@@ -1,0 +1,55 @@
+% Solutions to the exercises of Chapter 25.
+\begin{solutions}
+  \item With $H = [1\ \ -1]$, $HP_{\mathrm{aug}} = [\,Q\ \ 0\,]$ and $K = [Q\ \ 0]\T/(Q + R)$, so
+        \[
+          P^+ = P_{\mathrm{aug}} - KHP_{\mathrm{aug}} = \begin{bmatrix} P + Q - \dfrac{Q^2}{Q + R} & P \\[1ex] P & P \end{bmatrix}.
+        \]
+        The clone's variance and its covariance with $x_2$ are unchanged ($P = Q = R = 1$ gives $\big[\begin{smallmatrix} 1.5 & 1 \\ 1 & 1\end{smallmatrix}\big]$). The clone's gain is
+        $\Cov(x_c, x_2 - x_c)/S$, and here $x_2 - x_c = w$ is independent of $x_c$. A relative measurement corrects the clone whenever this covariance is not zero:
+        if an absolute measurement of $x_2$ was made after cloning, if the dynamics are not a pure random walk ($x_2 = ax_1 + w$ with $a \ne 1$), or if other correlated
+        states such as a velocity link them. For example, after an absolute fix of $x_2$ with unit variance the covariance is $\tfrac13\big[\begin{smallmatrix} 2 & 1 \\ 1 & 2\end{smallmatrix}\big]$, the
+        relative measurement's gain is $(0.2, -0.2)$, and the clone's variance falls from $0.67$ to $0.6$: information flows back in time, as in a smoother. In the
+        MSCKF this is the normal case: a feature seen by several clones corrects all of them.
+
+  \item Clone $x_{c_1}$ at time 1, propagate, clone $x_{c_2}$ at time 2, propagate to the current state $x$ at time 3 (the exercise's $x_2$ is this current state). With
+        $P = Q = R = 1$ the covariance of $(x, x_{c_1}, x_{c_2})$ is $\left[\begin{smallmatrix} 3 & 1 & 2 \\ 1 & 1 & 1 \\ 2 & 1 & 2\end{smallmatrix}\right]$. The two displacement measurements
+        are $z_a = x_{c_2} - x_{c_1} + n_a$ and $z_b = x - x_{c_2} + n_b$, with independent noises. Processing them one after the other (in either order), or stacked, gives
+        posterior variances $(2, 1, 1.5)$. The alternative pair is anchored at the first clone:
+        \[
+          z_1' = z_a + z_b = x - x_{c_1} + (n_a + n_b), \qquad z_2' = z_a = x_{c_2} - x_{c_1} + n_a,
+        \]
+        i.e.\ $z' = Tz$ with $T = \big[\begin{smallmatrix} 1 & 1 \\ 1 & 0\end{smallmatrix}\big]$. The two share $n_a$, so their noise covariance is $TRT\T = \big[\begin{smallmatrix} 2 & 1 \\ 1 & 1\end{smallmatrix}\big]$. An invertible
+        $T$ changes neither $H\T R\inv H$ nor $H\T R\inv z$, so the update with $(TH, TRT\T)$ is identical: posterior variances $(2, 1, 1.5)$ again. To process the anchored pair
+        sequentially, decorrelate first: after $z_1'$, use $z_2' - \tfrac12z_1'$, with Jacobian $(-\tfrac12, -\tfrac12, 1)$ and variance $\tfrac12$. Both kinds of correlation must be kept,
+        those between the states (the clones) and those between the noises. Dropping the noise correlation gives variances $(1.86, 1, 1.43)$: overconfident, because
+        $n_a$ is counted twice.
+
+  \item With column-major storage, the active $n\times n$ block in a buffer of leading dimension $N_{\max}$, and the block to delete at offset $o$:
+        \begin{enumerate}[label=(\alph*)]
+          \item for $j = o, \dots, n - 7$ in ascending order, copy column $j + 6$ into column $j$ (rows $0, \dots, n - 1$);
+          \item for $i = o, \dots, n - 7$ in ascending order, copy row $i + 6$ into row $i$ (columns $0, \dots, n - 7$);
+          \item set $n \gets n - 6$ (and optionally zero the vacated strip, which makes stale reads visible).
+        \end{enumerate}
+        Each copy reads an element before anything overwrites it, because sources always lie after their destinations. Copying one whole row or column into
+        a \emph{different} one never overlaps, so Eigen row and column assignments are safe. Assigning a block to an overlapping block of the same matrix is
+        not. A simulation of exactly this element order reproduces the reference bit for bit, while the descending order corrupts it. Test it against a
+        reference built by index selection (\code{P(idx, idx)} into a dynamic matrix, which may allocate in the test): random SPD $75\times75$ matrices, deleting the
+        first clone (offset 15), a middle one and the last one (offset 69). Require exact equality and symmetry. Run the deletion inside the allocation
+        guard with Eigen's allocations forbidden (\code{EIGEN\_RUNTIME\_NO\_MALLOC}), since the guard alone cannot see them (\cref{ch:engineering}).
+
+  \item With 50 features of 6 observations, $d = 50\cdot(2\cdot6 - 3) = 450$ rows. Counting $HP$, $HPH\T$, the Cholesky factorization of $S$, the gain solve and the Joseph
+        update in the leading-order flop counts, and the QR compression of the $d\times(n + 1)$ matrix $[H\ r]$ to $n$ rows:
+        \begin{center}\small
+        \begin{tabular}{@{}c c c c c@{}}
+        \toprule
+        $N_{\max}$ & $n = 15 + 6N_{\max}$ & without QR & with QR & saving \\
+        \midrule
+        10 & 75 & 108~Mflop & 11~Mflop & $\times10$ \\
+        20 & 135 & 199~Mflop & 50~Mflop & $\times4$ \\
+        30 & 195 & 321~Mflop & 136~Mflop & $\times2.4$ \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        The per-feature projections cost only $0.3$~Mflop in total. Without compression, the $d^3/3$ factorization and the $d^2n$ products dominate. With it, everything is
+        $\mathcal{O}(n^3)$ after an $\mathcal{O}(dn^2)$ QR, and the saving shrinks as $n$ approaches $d$. Note also the $n^3$ growth: tripling the window costs more than ten times as much.
+\end{solutions}

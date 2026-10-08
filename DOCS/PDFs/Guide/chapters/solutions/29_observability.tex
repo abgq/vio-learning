@@ -1,0 +1,99 @@
+% Solutions to the exercises of Chapter 29.
+\begin{solutions}
+  \item Draw a random state (IMU, one clone, one feature). Apply $p \mapsto R_zp + t$, $v \mapsto R_zv$, $R \mapsto R_zR$ (and the same to the clone and the feature) with $R_z = \Exp(\alpha e_z)$,
+        leaving the biases unchanged. Compute $x'\bminus x$ with the local attitude difference $\Log(\hat R\T R')$, and compare it with $N[t;\ \alpha]$. With $\|t\|, |\alpha| \approx 10^{-3}$, the
+        discrepancy is $4\times10^{-5}$ against entries of $3\times10^{-2}$. With $10^{-5}$ it is $2\times10^{-10}$ against $6\times10^{-5}$: it falls quadratically, so $N$ is the exact first-order map. The
+        attitude rows come out as $\hat R\T e_z$ and $\hat R_i\T e_z$. With a global attitude error they would be the constant $e_z$, a reminder that $N$ must be written in the
+        filter's own error coordinates.
+
+  \item For \emph{every} state, translating all positions and features leaves both the dynamics and the measurements unchanged. The nominal kinematics never use
+        the position itself, only its rate, and the camera depends on positions only through differences $p_f - p_{wb_i}$. Differentiating these identities
+        at \emph{any} linearization point gives $\Phi_kN_t = N_t$ and $H_kN_t = 0$, or $H_{x,j}N_t + H_{f,j} = 0$ and hence $H_{o,j}N_t = 0$ after projection. The translation columns
+        $N_t = (I, 0, 0, 0, 0, I, 0, \dots)$ contain no estimates at all, so the product telescopes trivially, whatever estimates the individual factors used:
+        \[
+          H_k\Phi_{k-1}\cdots\Phi_1N_t = H_kN_t = 0 .
+        \]
+        The yaw column contains $\hat p$, $\hat v$, $\hat R$ and the clone estimates. The $N$ that one factor maps into is then not the $N$ that the next factor annihilates, unless the
+        estimates agree. (The pose measurement of Milestones 6--7 is different: it observes absolute position, so translations are observable there.)
+
+  \item The state is $x = (p, \psi, \ell_1, \ell_2) \in \R^7$ and the output $h = (R\T(\ell_1 - p), R\T(\ell_2 - p)) \in \R^4$, with
+        $\nabla h_i = \big[-R\T\ \ -\Omega h_i\ \ \cdots\ \ R\T\ \ \cdots\big]$, the $R\T$ in the columns of $\ell_i$. As before, $L_{f_v}h_i = -e_1$ is constant and $L_{f_\omega}h_i = -\Omega h_i$, whose gradient
+        $-\Omega\nabla h_i$ lies in the row space of $\nabla h_i$; the same holds for all higher derivatives. So $d\mathcal{O}$ is the row space of $[\nabla h_1;\ \nabla h_2]$. Its landmark
+        columns form the invertible $\blkdiag(R\T, R\T)$, so the rank is 4. (Numerically, with the closed-form Lie derivatives, the singular values are $12.2$, $3.0$, $2.3$,
+        $1.7$, and then exactly zero three times.) Three directions are unobservable, the same three as with one landmark:
+        \[
+          N_t = (I_2,\ 0,\ I_2,\ I_2), \qquad N_r = (\Omega p,\ 1,\ \Omega\ell_1,\ \Omega\ell_2),
+        \]
+        since $\nabla h_iN_r = -R\T\Omega p - \Omega R\T(\ell_i - p) + R\T\Omega\ell_i = 0$ by $R\T\Omega = \Omega R\T$. Each new landmark adds two states and two independent outputs, so landmarks never reduce
+        the number of unobservable directions. Only known landmarks do.
+
+  \item The measurement depends on the state only through $d = R(\psi)\T(\ell_j - p)$, so by the chain rule $H_k^{\mathrm{rb}} = J_z(\hat d_k)\,H_k$, with $H_k$ the Cartesian Jacobian
+        \eqref{eq:slam-H} and
+        \[
+          J_z = \frac{\partial(\|d\|, \atantwo(d_y, d_x))}{\partial d} = \begin{bmatrix} d\T/\rho \\ (\Omega d)\T/\rho^2 \end{bmatrix}, \qquad \rho = \|d\|, \qquad \det J_z = \frac1\rho \ne 0 .
+        \]
+        Multiplying \cref{thm:slam-obs} on the left by $J_z$:
+        \[
+          H_k^{\mathrm{rb}}\Phi_{k-1}\cdots\Phi_1N_t = 0, \qquad
+          H_k^{\mathrm{rb}}\Phi_{k-1}\cdots\Phi_1N_r = J_z(\hat d_k)\,\hat R_k\T\Omega\big(D_k + \bar\ell_j - \hat\ell_j\big).
+        \]
+        The leak is the Cartesian one premultiplied by an invertible matrix, so it vanishes under exactly the same conditions, and FEJ cures it in the same way. This
+        holds for any measurement of the body-frame landmark position: only the factor $J_z$ changes.
+
+  \item Propagate a copy of $N$ alongside $P$: multiply it by each $\Phi_k$ the filter uses and append $J_xN$ when a landmark is initialized (the filter's own
+        augmentation Jacobian). At every update, print $\|HN\|$ for the Jacobian $H$ the filter actually uses. Over five runs of the \cref{fig:fej} scenario:
+        \begin{center}\small
+        \begin{tabular}{@{}l c c@{}}
+        \toprule
+        filter & $\max\|HN_t\|$ & $\|HN_r\|$ (median / max) \\
+        \midrule
+        standard EKF & 0 & 0.17 / 0.9 \\
+        FEJ-EKF & 0 & $9\times10^{-16}$ / $4\times10^{-15}$ \\
+        ideal EKF & 0 & $9\times10^{-16}$ / $4\times10^{-15}$ \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        Only the standard EKF violates the condition, and only in the rotation direction, by an amount that tracks the accumulated corrections. One subtlety
+        appeared on the way. If the ideal filter evaluates the landmark-initialization Jacobian with the \emph{noisy} measurement, $\Omega R(\psi)z$ instead of $\Omega(\ell_j - p)$, the landmark
+        enters $N$ at $\ell_j + Rn$ while $H$ uses $\ell_j$. Then $\|HN_r\| \approx 0.12$, the size of the measurement noise, and the ``ideal'' filter gains a little heading information (its
+        final RMS heading error drops from $2.8^\circ$ to $2.5^\circ$). Every Jacobian that involves a state must use the same linearization point, the augmentation Jacobian
+        included.
+
+  \item Each row is separate: minimize $\|d\|^2$ subject to $dN = c$, with $d \in \R^{1\times n}$ and $N \in \R^{n\times m}$ of full column rank. Split $d = d_\parallel + d_\perp$ with $d_\parallel = yN\T$ in the row space of
+        $N\T$ and $d_\perp N = 0$. The constraint sees only $d_\parallel$: $yN\T N = c$, so $y = c(N\T N)\inv$ and $d_\parallel = c(N\T N)\inv N\T$ is the same for every feasible $d$. Since $d_\parallel d_\perp\T = yN\T d_\perp\T = 0$,
+        \[
+          \|d\|^2 = \|d_\parallel\|^2 + \|d_\perp\|^2 \ge \|d_\parallel\|^2,
+        \]
+        with equality exactly when $d_\perp = 0$. The unique minimizer is $d = c(N\T N)\inv N\T$, which with $c = -hN$ (for $H$) or $c = n_{k+1} - hN_k$ (for $\Phi$) gives \cref{prop:oc-ekf}.
+
+  \item At rest the velocity is zero, so use the pseudo-measurement $z = 0 = v_{wb} + n_{\mathrm{zv}}$ with $R_{\mathrm{zv}} = \sigma_{\mathrm{zv}}^2I_3$. The residual is $r = 0 - \hat v$, and since the velocity error is additive
+        ($v = \hat v + \delta v$),
+        \[
+          H = \begin{bmatrix} 0_3 & I_3 & 0_3 & 0_3 & 0_3 & 0_{3\times6N} \end{bmatrix}.
+        \]
+        A companion \emph{zero-rate} update uses $\omega_m = b_g + n_g$ at rest: a direct measurement of the gyro bias, with $H$ selecting the $\delta b_g$ columns. Safety rules:
+        \begin{itemize}
+          \item apply it only when stillness is certain: accelerometer and gyro variance over a window below thresholds, and negligible feature motion.
+                A hovering drone is not stationary, and a false zero-velocity update is a confident wrong measurement;
+          \item keep $\sigma_{\mathrm{zv}}$ realistic (centimeters per second, to cover vibration);
+          \item apply it at a modest rate, not at every IMU sample. All these updates rest on one stillness hypothesis, so their errors are not
+                independent, and 200 of them per second would make the filter overconfident.
+        \end{itemize}
+        For EuRoC it applies only before take-off. It bounds velocity and position drift at rest, but adds nothing about yaw.
+
+  \item Following~\cite{li2013msckf2} and \cref{sec:fej}, three kinds of Jacobian need fixed linearization points:
+        \begin{enumerate}[label=(\alph*)]
+          \item the IMU transition matrix from $t_k$ to $t_{k+1}$, evaluated with the propagated estimates at both ends, $\hat x_{k|k-1}$ and $\hat x_{k+1|k}$, so that consecutive matrices telescope.
+                \ifsolutions This includes the attitude block, which must be $\hat R_{k+1|k}\T\hat R_{k|k-1}$ instead of $\Exp(-\hat\omega\Dt)$, so that it maps $\hat R_{k|k-1}\T e_z$ to $\hat R_{k+1|k}\T e_z$;
+                \else This includes the attitude block, which must map $\hat R_{k|k-1}\T e_z$ to $\hat R_{k+1|k}\T e_z$ (\cref{sec:fej});\fi
+          \item the camera Jacobians with respect to each clone, evaluated at the clone's \emph{first estimate}, its pose when it was cloned (the propagated estimate at the image
+                time), while the residual uses the current estimate;
+          \item the feature Jacobians, evaluated at one estimate of the feature for all of its observations (any single estimate works, because the feature is
+                eliminated).
+        \end{enumerate}
+        Storage without allocation: give the clone record a second pose, e.g.\ \code{struct Clone \{ nanoseconds t; Vector3d p, p\_fej; Quaterniond q, q\_fej; uint64\_t id; \}} in the
+        fixed-capacity ring buffer of \code{kMaxClones} entries. The FEJ fields are written once, at cloning, and skipped by injection. Marginalization drops them with the
+        clone. For the IMU, keep one member copy of the previous propagated state $(\hat p, \hat v, \hat q)_{k|k-1}$: compute $\Phi_k$ from it and the newly propagated state, then
+        overwrite it with the newly propagated state \emph{before} any update is applied. All of it is fixed-size, so E4 is unaffected. The test is the one of the
+        implementation note: $\|H_kN_k\|$ and $\|\Phi_kN_k - N_{k+1}\|$ at rounding level on a synthetic run.
+\end{solutions}

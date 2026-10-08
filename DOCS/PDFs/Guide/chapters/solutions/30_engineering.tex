@@ -1,0 +1,109 @@
+% Solutions to the exercises of Chapter 30.
+\begin{solutions}
+  \item The core of a minimal guard:
+\begin{lstlisting}
+inline int g_allocations = 0;                  // reset before, check after
+void* operator new(std::size_t n) {
+  ++g_allocations;
+  if (void* p = std::malloc(n)) return p;
+  throw std::bad_alloc();
+}
+void operator delete(void* p) noexcept { std::free(p); }
+void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+\end{lstlisting}
+        Reset the counter immediately before the code under test and read it immediately after, because the test framework allocates too. Measured
+        with clang/libc++:
+        \begin{itemize}
+          \item four \code{push\_back} calls into a vector with \code{reserve(4)}: 0 allocations; the fifth: 1 (the reallocation);
+          \item resizing a fixed-max $75\times75$ matrix from $15\times15$ to $75\times75$: 0, because the storage is inline;
+          \item a dynamic \code{Eigen::MatrixXd(10, 10)}: also 0. This is not because it does not allocate, but because Eigen allocates with \code{std::malloc}
+                through its own aligned allocator, which never calls \code{operator new}.
+        \end{itemize}
+        With \code{EIGEN\_RUNTIME\_NO\_MALLOC} and \code{set\_is\_malloc\_allowed(false)}, the same \code{MatrixXd} aborts with Eigen's assertion ``heap allocation is forbidden''. The guard and
+        the flag are therefore both needed. Since the flag is defined only in the \code{debug-sanitize} preset, Eigen allocations are caught only there. Defining it for the
+        test targets of both presets would close that gap; it is a design decision to record in \code{PROGRESS.md}. A complete guard also overrides the aligned
+        forms \code{operator new(std::size\_t, std::align\_val\_t)}, which the library implements without calling the plain one.
+
+  \item Five candidates, built in both presets:
+        \begin{center}\small
+        \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{4.6cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X@{}}
+        \toprule
+        code & release & debug-sanitize \\
+        \midrule
+        \code{auto e = R * (a + b);} & correct & correct (the sum is stored by value) \\
+        \code{auto e = (a + b).eval().transpose();} & correct, by luck & ASan: stack-use-after-scope \\
+        \code{auto e = make().head<2>();} & correct, by luck & ASan: stack-use-after-scope \\
+        \code{auto e = (X * 2.0).eval().block(0, 0, 2, 2);} (dynamic) & garbage, $10^{-311}$ entries, no crash & ASan: stack-use-after-scope \\
+        \code{auto e = A * v;} then modify \code{A} & ``wrong'': uses the new \code{A} & no report \\
+        \bottomrule
+        \end{tabularx}
+        \end{center}
+        Here \code{make()} returns a \code{Vector3d} by value. Dangling references are undefined behavior: the optimized build may print the right numbers because
+        the dead temporary's stack slot has not been reused yet, or garbage, as in the dynamic case. AddressSanitizer reports them reliably, as a read of a variable
+        whose scope has ended. The stale expression is not undefined behavior at all, since every access is to valid memory. The expression is simply evaluated
+        later than the reader assumed, so no sanitizer can report it. Only the rule ``no \code{auto} with Eigen'' prevents it.
+
+  \item Ten thousand propagation steps of a $75\times75$ covariance (the $15\times15$ block with $\Phi P\Phi\T + Q$, the $15\times60$ cross block with $\Phi P_{IC}$), per step:
+        \begin{center}\small
+        \begin{tabular}{@{}l c c@{}}
+        \toprule
+        implementation & release & debug-sanitize \\
+        \midrule
+        fixed-max, member workspaces & \SI{3.0}{\micro\second} & \SI{500}{\micro\second} \\
+        dynamic, temporaries in expressions & \SI{3.3}{\micro\second} & \SI{525}{\micro\second} \\
+        dynamic, preallocated workspaces & \SI{3.3}{\micro\second} & \SI{505}{\micro\second} \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        In release, the arithmetic (about $4\times10^4$ flops) dominates. The three small heap allocations per step of the naive dynamic version cost a few hundred
+        nanoseconds, and fixed sizes let Eigen unroll the $15\times15$ parts. That gives a 10\% difference, not an order of magnitude. The dynamic version with workspaces does not allocate
+        either (it ran with Eigen allocations forbidden). The case for fixed-max matrices is therefore not average speed but the \emph{guarantee}: the storage is
+        inline, its bound is checked, and no forgotten \code{.noalias()} or temporary can allocate in the hot path. That is what makes the worst case predictable. The
+        sanitizer build is about 170 times slower. At \code{-O0} none of Eigen's small template functions is inlined, and ASan checks every load and store. Use it to
+        prove correctness (both allocation-free versions ran with \code{malloc} forbidden), never to measure speed.
+
+  \item With the right Jacobian $\Jr$ of \cref{ch:lie}, tested against central differences of $\Log(\Exp(\phi)\T\Exp(\phi + \delta))$ ($h = 10^{-6}$, so the correct version agrees to $10^{-10}$), the
+        largest error of three broken versions at four test points is:
+        \begin{center}\small
+        \begin{tabular}{@{}l c c c c@{}}
+        \toprule
+        breakage & $\phi = 0$ & $\|\phi\| = 0.05$ & $\|\phi\| = 0.5$ & $\|\phi\| = 2.5$ \\
+        \midrule
+        sign of the $\sx{\phi}$ term flipped (this is $\Jl$) & 0 & $4\times10^{-2}$ & $0.4$ & $1.1$ \\
+        second-order term dropped & 0 & $4\times10^{-4}$ & $4\times10^{-2}$ & $0.65$ \\
+        Taylor branch used below $0.1$~rad & 0 & $4\times10^{-4}$ & $8\times10^{-11}$ & $9\times10^{-11}$ \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        A test at $\phi = 0$ detects nothing, since every version equals $I$ there. A test at a single generic angle misses the wrong branch threshold. A loose tolerance
+        ($10^{-3}$, say) misses the dropped term at small angles. Hence the rules: several random points spanning the regimes (tiny, inside every branch, generic, near
+        $\pi$), and a tolerance derived from the finite-difference error rather than chosen for comfort.
+
+  \item Reading \code{a[4]} of a \code{std::array<int, 4>} and computing \code{INT\_MAX + 1}:
+        \begin{itemize}
+          \item \emph{release}: the read returned 1634890337 (whatever lay next on the stack) and the addition printed $-2147483648$. No crash and no message.
+                Neither result is guaranteed: both are undefined behavior, and the optimizer may, for example, fold \code{x + 1 > x} to \code{true};
+          \item \emph{debug-sanitize}: ASan stops at the read with \code{stack-buffer-overflow ... READ of size 4} and the file and line of the access. UBSan stops at the
+                addition with \code{runtime error: signed integer overflow: 2147483647 + 1 cannot be represented in type 'int'}. With \code{-fno-sanitize-recover=all}
+                both abort, so a test that triggers them fails.
+        \end{itemize}
+        Note that \code{std::array::operator[]} does not check bounds. ASan caught the read because the array lives on the stack between redzones. Compiling with libc++'s
+        hardening (\code{-D\_LIBCPP\_HARDENING\_MODE=\_LIBCPP\_HARDENING\_MODE\_FAST}) adds a cheap bounds check that traps even in an optimized build: the process stopped with an
+        illegal-instruction exception.
+
+  \item Binding a $3\times3$ block of a row-major matrix to \code{Eigen::Ref<const Eigen::MatrixXd>} compiles and gives the right result, but \code{Ref} cannot describe a row-major block
+        with column-major strides, so it copies the block into an internal \code{MatrixXd}. The operator-new guard counts 0 allocations, because the copy is an Eigen
+        allocation through \code{malloc}. With \code{set\_is\_malloc\_allowed(false)} the call aborts with Eigen's assertion. A column-major block binds without any copy (it passes with
+        allocations forbidden). With a writable \code{Eigen::Ref<Eigen::MatrixXd>}, the call does not compile: \code{no matching function for call to 'scale'}. A writable reference cannot
+        silently redirect writes into a copy. Keep one storage order throughout the core (column-major, Eigen's default), or write the \code{Ref} type for the layout
+        actually passed.
+
+  \item With \code{PoseEvent} added to the variant and no lambda for it, libc++ stops with
+        \begin{center}
+        \small\code{static assertion failed due to requirement 'is\_invocable\_v<Overloaded<...>, const PoseEvent \&>':}\\
+        \small\code{`std::visit` requires the visitor to be exhaustive.}
+        \end{center}
+        This is followed by notes leading back to the \code{std::visit} call. Every dispatch site that forgot the new event type fails to compile, which is the point of the
+        design. The one way to defeat it is a catch-all generic lambda, \code{[](const auto\&) \{\}}, which silently swallows new alternatives. Do not put one in the
+        event dispatch.
+\end{solutions}

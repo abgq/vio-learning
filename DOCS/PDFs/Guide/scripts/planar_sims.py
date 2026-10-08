@@ -373,7 +373,10 @@ def run_ekf_slam(seed, variant, steps=600, sig_v=0.05, sig_w=0.004, sig_m=0.05, 
             n = len(x)
             Jx = np.zeros((2, n))
             Jx[:, 0:2] = np.eye(2)
-            Jx[:, 2] = OM @ rot(ps) @ z
+            # d(p + R(psi) z)/d psi = OM R(psi) z. The ideal filter evaluates it at the true state, i.e. with the noise-free
+            # relative position R(psi)z = l - p; using the noisy z would linearize the landmark at l + R n here but at l in H,
+            # which breaks the nullspace (Exercise 29.5).
+            Jx[:, 2] = OM @ (lms[j] - p) if variant == "ideal" else OM @ rot(ps) @ z
             Jz = rot(ps)
             Pnew = np.zeros((n + 2, n + 2))
             Pnew[:n, :n] = P
