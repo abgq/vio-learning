@@ -1,0 +1,15 @@
+14.2 GPG^T diag [0.00010025 0.00010025 0.01      ]  JPJ^T diag [9.99166944e-05 9.99166944e-05 1.00000000e-02]
+     max offdiag 1.0814916670542908e-22 7.793824047799063e-22
+     relative diff xx: 0.00333583454081543
+     anisotropic: GPG [[0.000125   0.000495   0.        ]
+ [0.000495   0.01000025 0.        ]
+ [0.         0.         0.0001    ]] 
+ JPJ [[0.00012463 0.00049376 0.        ]
+ [0.00049376 0.00996696 0.        ]
+ [0.         0.         0.0001    ]]
+     |dtheta|=0.003: max rel diff 3.0e-06
+     |dtheta|=0.03: max rel diff 3.0e-04
+     |dtheta|=0.3: max rel diff 3.1e-02
+     |dtheta|=1.0: max rel diff 4.1e-01
+14.4 still=False: final bias sigma [0.0008  0.00082 0.00081], final bias error [-0.00018 -0.00052  0.00017]
+14.4 still=True: final bias sigma [0.00065 0.00065 0.00379], final bias error [-3.000e-05 -1.000e-04  1.047e-02]

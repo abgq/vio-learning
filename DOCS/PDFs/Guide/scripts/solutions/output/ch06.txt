@@ -1,0 +1,20 @@
+6.2 std 7.088812050083353  lag 99.49916247342207
+6.3 1kHz sample 0.06324555320336758  avg1000 0.002  100Hz 0.02
+6.5 m=1: MC var 9.78, theory 10, ratio 0.978
+6.5 m=2: MC var 327.2, theory 333.3, ratio 0.982
+6.5 m=3: MC var 4964, theory 5000, ratio 0.993
+    95% band for ratio with 1000 runs: +- 0.08769772454796584
+6.8 2h @200Hz: fitted sigma_g 1.7097e-04 (true 1.6968e-04), sigma_bg 1.6863e-05 (true 1.9393e-05)
+    min of Allan dev at tau=16.2s, value 6.002e-05; crossover sqrt(3) sg/sb = 15.2s
+    reading at 1 s: sigma_A(1) = 1.6819e-04 (white alone would be 1.6968e-04)
+    T=  0.5 h: rel. std of sigma_bg 0.163, mean ratio 0.989
+    T=  1.0 h: rel. std of sigma_bg 0.124, mean ratio 0.982
+    T=  2.0 h: rel. std of sigma_bg 0.099, mean ratio 0.954
+    T=  4.0 h: rel. std of sigma_bg 0.087, mean ratio 0.987
+    T=  8.0 h: rel. std of sigma_bg 0.086, mean ratio 0.977
+    T= 16.0 h: rel. std of sigma_bg 0.073, mean ratio 0.984
+T= 0.5 h: rel std 0.127, mean ratio 0.971
+T= 1.0 h: rel std 0.087, mean ratio 0.984
+T= 2.0 h: rel std 0.059, mean ratio 1.003
+T= 4.0 h: rel std 0.045, mean ratio 0.994
+T= 8.0 h: rel std 0.029, mean ratio 0.996

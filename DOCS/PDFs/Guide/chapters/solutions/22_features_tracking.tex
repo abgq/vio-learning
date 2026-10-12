@@ -46,12 +46,27 @@
         the feature moves 23~px to the left, the same as $KR_{c_2c_1}K\inv\tilde u_1$ gives. The prediction does not depend on depth; the neglected translation, 1~m/s
         over 50~ms at 5~m depth for example, adds only $f_u\cdot0.05/5 \approx 4.6$~px, which LK recovers easily from the predicted start.
 
-  \item Divide the image into cells (for example $8\times6$ cells of $94\times80$~px for EuRoC). Compute the corner response once; then, for each cell below its quota,
-        take its strongest local maxima above the threshold, skipping candidates within the minimum distance of an existing track or an already chosen
-        corner (a mask with discs around them). Count the features per cell before detecting, so that only depleted cells receive new ones. To evaluate,
-        plot the corners with and without bucketing and report two numbers: the fraction of occupied cells and the eigenvalues of the covariance of the
-        feature bearings. Without bucketing, the strongest corners concentrate on the most textured objects, leaving large parts of the view empty. With
-        bucketing they cover the image, and the bearing covariance becomes nearly isotropic, which is what conditions the stacked Jacobian.
+  \item Divide the image into cells (for example $8\times6$ cells of $94\times80$~px for EuRoC). Compute the corner response once, with non-maximum suppression and
+        one global threshold. Then take candidates strongest first, skipping any in a cell that has reached its quota or within the minimum distance of an
+        existing track or an already chosen corner. Count the existing features per cell before detecting, so that only depleted cells receive new ones. To
+        evaluate, report two numbers: the fraction of occupied cells, and the spread of the feature bearings (the standard deviations along the principal
+        axes of their covariance, after undistortion). The script \code{scripts/solutions/ch22\_bucketing.py} does this for 150 corners, 10~px apart, with and
+        without a quota of 4 per cell. It uses the first frame of \code{data/MH\_01\_easy} when the dataset is present. On a synthetic $752\times480$ image with one strongly
+        textured region and weak texture elsewhere (one fifth of the contrast):
+        \begin{center}\small
+        \begin{tabular}{@{}l c c c@{}}
+        \toprule
+        selection & occupied cells & most corners in a cell & bearing spread (rad) \\
+        \midrule
+        strongest 150 & 46\% & 18 & 0.26 / 0.21 \\
+        bucketed, at most 4 per cell & 96\% & 4 & 0.55 / 0.32 \\
+        \bottomrule
+        \end{tabular}
+        \end{center}
+        Without bucketing, every corner lies on the textured region and half of the view is empty. With bucketing, the corners cover nearly every cell, and
+        the bearings spread twice as wide along the long axis of the image, which is what conditions the stacked Jacobian. Bucketing redistributes corners
+        but cannot create texture: with a global threshold, cells whose texture is below it stay empty. That is the right outcome, since a corner too weak
+        to pass the threshold is also too weak to track.
 
   \item A pool of fixed capacity $F_{\max}$ (at least the per-cell quota times the number of cells, plus room for tracks that are lost but not yet processed):
         \begin{itemize}

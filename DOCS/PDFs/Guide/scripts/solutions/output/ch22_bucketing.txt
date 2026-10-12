@@ -1,0 +1,4 @@
+image: synthetic test image (data/MH_01_easy not found)
+strongest 150       : 150 corners, occupied cells 46%, bearing std along principal axes 0.263 / 0.205 (ratio 0.78), max per cell 18
+bucketed (quota 4)  : 150 corners, occupied cells 96%, bearing std along principal axes 0.545 / 0.316 (ratio 0.58), max per cell 4
+wrote scripts/solutions/output/ch22_bucketing.png (left: strongest corners, right: bucketed)

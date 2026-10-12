@@ -1,0 +1,15 @@
+27: final RMS position DR 2.14 m, MSCKF 0.85 m, ratio 2.51
+27: final RMS heading error MSCKF 0.0693 rad; run-0 final heading sigma 0.0669 rad; odometry sigma_w sqrt(90) = 0.190
+27: NEES bounds [2.19, 3.94]
+    NEES mean in (0,10] s: 2.72, min 2.21, max 3.58
+    NEES mean in (10,20] s: 2.48, min 2.16, max 2.98
+    NEES mean in (20,30] s: 2.24, min 1.89, max 3.12
+    NEES mean in (30,45] s: 2.73, min 2.23, max 3.51
+    NEES mean in (45,60] s: 2.75, min 2.27, max 3.14
+    NEES mean in (60,75] s: 2.86, min 2.60, max 3.25
+    NEES mean in (75,90] s: 3.05, min 2.68, max 3.47
+    times below lower bound: 12.3 .. 28.5 s (53 samples); above upper: 0 samples
+27: gate rejection rate 0.052
+29 standard: first exceed 54.400000000000006 s, permanently above from 54.6 s, final 5.38, max 5.43, bounds [2.36,3.72]
+29 fej: first exceed None s, permanently above from None s, final 3.35, max 3.60, bounds [2.36,3.72]
+29 ideal: first exceed None s, permanently above from None s, final 3.34, max 3.56, bounds [2.36,3.72]

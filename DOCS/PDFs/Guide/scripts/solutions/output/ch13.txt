@@ -1,0 +1,15 @@
+13.2 sigma_phi=15 deg: Mahalanobis distance of linearized mean 0.665
+13.2 sigma_phi=30 deg: Mahalanobis distance of linearized mean 0.751
+13.2 sigma_phi=45 deg: Mahalanobis distance of linearized mean 0.814
+13.2 sigma_phi=60 deg: Mahalanobis distance of linearized mean 0.896
+13.2 sigma_phi=75 deg: Mahalanobis distance of linearized mean 0.992
+13.2 sigma_phi=90 deg: Mahalanobis distance of linearized mean 1.095
+13.2 threshold 76.11488999389114 deg
+     MC Mahalanobis at threshold: 0.9997539842493122
+13.4 UT mean 0.58  exact 0.58
+13.5 step 0: true x=2.00, z=1.87, weight of x<5: 0.521, weight near mirror (x>5): 0.479, mean 4.87
+13.5 step 1: true x=2.50, z=2.33, weight of x<5: 1.000, weight near mirror (x>5): 0.000, mean 2.35
+13.5 step 2: true x=3.00, z=2.99, weight of x<5: 1.000, weight near mirror (x>5): 0.000, mean 2.91
+13.5 step 3: true x=3.50, z=3.49, weight of x<5: 1.000, weight near mirror (x>5): 0.000, mean 3.44
+13.5 step 4: true x=4.00, z=3.96, weight of x<5: 1.000, weight near mirror (x>5): 0.000, mean 3.95
+13.5 step 5: true x=4.50, z=4.56, weight of x<5: 1.000, weight near mirror (x>5): 0.000, mean 4.49

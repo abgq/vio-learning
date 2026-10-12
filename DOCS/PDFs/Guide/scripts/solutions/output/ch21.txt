@@ -1,0 +1,17 @@
+21.2 n=1: kernel*2^n = [1 1], variance 0.250 (n/4 = 0.25)
+21.2 n=2: kernel*2^n = [1 2 1], variance 0.500 (n/4 = 0.5)
+21.2 n=3: kernel*2^n = [1 3 3 1], variance 0.750 (n/4 = 0.75)
+21.2 n=4: kernel*2^n = [1 4 6 4 1], variance 1.000 (n/4 = 1.0)
+21.2 n=5: kernel*2^n = [ 1  5 10 10  5  1], variance 1.250 (n/4 = 1.25)
+21.2 n=6: kernel*2^n = [ 1  6 15 20 15  6  1], variance 1.500 (n/4 = 1.5)
+21.3 correlation response 5.599999999999998 = 7.999999999999997 c ; convolution response -7.999999999999997 c
+21.4 sigma=0: RMS false pattern in r in (48,128): 0.353 (no blur: 0.353); Gaussian response at 1/8: 1.000, at 1/4: 1.0000
+21.4 sigma=0.5: RMS false pattern in r in (48,128): 0.227 (no blur: 0.353); Gaussian response at 1/8: 0.926, at 1/4: 0.7346
+21.4 sigma=1.0: RMS false pattern in r in (48,128): 0.061 (no blur: 0.353); Gaussian response at 1/8: 0.735, at 1/4: 0.2912
+21.4 sigma=1.5: RMS false pattern in r in (48,128): 0.018 (no blur: 0.353); Gaussian response at 1/8: 0.500, at 1/4: 0.0623
+21.4 sigma=2.0: RMS false pattern in r in (48,128): 0.005 (no blur: 0.353); Gaussian response at 1/8: 0.291, at 1/4: 0.0072
+21.4 sigma=2.5: RMS false pattern in r in (48,128): 0.003 (no blur: 0.353); Gaussian response at 1/8: 0.145, at 1/4: 0.0004
+21.4 sigma=3.0: RMS false pattern in r in (48,128): 0.002 (no blur: 0.353); Gaussian response at 1/8: 0.062, at 1/4: 0.0000
+21.6 Gaussian peak sigma=0.7: max |bias| 0.095 px; at d=0.3: -0.094
+21.6 Gaussian peak sigma=1.0: max |bias| 0.048 px; at d=0.3: -0.048
+21.6 Gaussian peak sigma=1.5: max |bias| 0.021 px; at d=0.3: -0.021

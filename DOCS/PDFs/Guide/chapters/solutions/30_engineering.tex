@@ -22,23 +22,19 @@ void operator delete(void* p, std::size_t) noexcept { std::free(p); }
         With \code{EIGEN\_RUNTIME\_NO\_MALLOC} and \code{set\_is\_malloc\_allowed(false)}, the same \code{MatrixXd} aborts with Eigen's assertion ``heap allocation is forbidden''. The guard and
         the flag are therefore both needed. Since the flag is defined only in the \code{debug-sanitize} preset, Eigen allocations are caught only there. Defining it for the
         test targets of both presets would close that gap; it is a design decision to record in \code{PROGRESS.md}. A complete guard also overrides the aligned
-        forms \code{operator new(std::size\_t, std::align\_val\_t)}, which the library implements without calling the plain one.
+        forms \code{operator new(std::size\_t, std::align\_val\_t)}, which the library implements without calling the plain one. The C++ experiments of these
+        solutions are in \code{scripts/solutions/cpp}, with \code{build\_and\_run.ps1} to build and run them in both configurations.
 
-  \item Five candidates, built in both presets:
-        \begin{center}\small
-        \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{4.6cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X@{}}
-        \toprule
-        code & release & debug-sanitize \\
-        \midrule
-        \code{auto e = R * (a + b);} & correct & correct (the sum is stored by value) \\
-        \code{auto e = (a + b).eval().transpose();} & correct, by luck & ASan: stack-use-after-scope \\
-        \code{auto e = make().head<2>();} & correct, by luck & ASan: stack-use-after-scope \\
-        \code{auto e = (X * 2.0).eval().block(0, 0, 2, 2);} (dynamic) & garbage, $10^{-311}$ entries, no crash & ASan: stack-use-after-scope \\
-        \code{auto e = A * v;} then modify \code{A} & ``wrong'': uses the new \code{A} & no report \\
-        \bottomrule
-        \end{tabularx}
-        \end{center}
-        Here \code{make()} returns a \code{Vector3d} by value. Dangling references are undefined behavior: the optimized build may print the right numbers because
+  \item Five candidates, each assigned afterwards to a concrete type and built in both presets:
+        \begin{itemize}
+          \item \code{auto e = R * (a + b);} gives correct numbers in both builds. The sum is a nested expression, which Eigen stores by value, so nothing dangles.
+          \item \code{auto e = (a + b).eval().transpose();} prints the right numbers in release, by luck. ASan reports \code{stack-use-after-scope}.
+          \item \code{auto e = make().head<2>();}, with \code{make()} returning a \code{Vector3d} by value, behaves the same way: right by luck in release, reported by ASan.
+          \item \code{auto e = (X * 2.0).eval().block(0, 0, 2, 2);} with a dynamic \code{X} prints garbage ($10^{-311}$ entries) in release without crashing.
+                ASan reports \code{stack-use-after-scope}.
+          \item \code{auto e = A * v;} followed by a change to \code{A} produces the product with the \emph{new} \code{A} in both builds, and no sanitizer reports anything.
+        \end{itemize}
+        Dangling references are undefined behavior: the optimized build may print the right numbers because
         the dead temporary's stack slot has not been reused yet, or garbage, as in the dynamic case. AddressSanitizer reports them reliably, as a read of a variable
         whose scope has ended. The stale expression is not undefined behavior at all, since every access is to valid memory. The expression is simply evaluated
         later than the reader assumed, so no sanitizer can report it. Only the rule ``no \code{auto} with Eigen'' prevents it.
@@ -99,10 +95,11 @@ void operator delete(void* p, std::size_t) noexcept { std::free(p); }
         actually passed.
 
   \item With \code{PoseEvent} added to the variant and no lambda for it, libc++ stops with
-        \begin{center}
-        \small\code{static assertion failed due to requirement 'is\_invocable\_v<Overloaded<...>, const PoseEvent \&>':}\\
-        \small\code{`std::visit` requires the visitor to be exhaustive.}
-        \end{center}
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\footnotesize]
+error: static assertion failed due to requirement
+  'is_invocable_v<Overloaded<...>, const PoseEvent &>':
+  std::visit requires the visitor to be exhaustive.
+\end{lstlisting}
         This is followed by notes leading back to the \code{std::visit} call. Every dispatch site that forgot the new event type fails to compile, which is the point of the
         design. The one way to defeat it is a catch-all generic lambda, \code{[](const auto\&) \{\}}, which silently swallows new alternatives. Do not put one in the
         event dispatch.

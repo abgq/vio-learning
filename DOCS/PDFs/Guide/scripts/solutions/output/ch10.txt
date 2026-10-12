@@ -1,0 +1,12 @@
+10.2 optimum [1.99321518 1.29281585]
+10.2 starts converging: GN 237/336, LM 336/336
+     start [0.5, 6.0] GN -> [      0.    3427063.412] False  LM -> [1.993 1.293]
+     start [4.0, -1.0] GN -> [1.993 1.293] True  LM -> [1.993 1.293]
+     start [1.0, 4.0] GN -> [nan nan] False  LM -> [1.993 1.293]
+10.3 zero-residual GN errors: ['8.1e-02', '3.0e-03', '3.4e-06', '3.8e-12', '0.0e+00', '0.0e+00']
+10.4 LS           slope 0.394 intercept 1.921
+10.4 Huber        slope 0.489 intercept 1.040
+10.4 Cauchy       slope 0.495 intercept 0.984
+10.4 inliers only slope 0.496 intercept 0.980
+10.5 max |schur - full| = 8.43769498715119e-14  off-diag of C zero: 0.0
+10.6 reduced system vs inv of camera block: 5.0182080713057076e-14

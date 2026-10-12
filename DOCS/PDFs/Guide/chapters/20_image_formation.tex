@@ -161,8 +161,8 @@ used by EuRoC maps ideal normalized coordinates $(x, y)$ to distorted ones $(x_d
 \end{align}
 after which $K$ is applied to $(x_d, y_d)$. The \emph{radial} terms ($k_1, k_2$) model the dominant symmetric distortion of a lens; the \emph{tangential} terms ($p_1, p_2$)
 model a lens slightly tilted or decentered relative to the sensor. For \code{cam0}, $(k_1, k_2, p_1, p_2) = (-0.2834, 0.07396, 1.94\times10^{-4}, 1.76\times10^{-5})$. The negative
-$k_1$ produces \emph{barrel} distortion (\cref{fig:distortion}). At the middle of the left and right image edges the radial factor $1 + k_1r^2 + k_2r^4$ is about $0.79$,
-which moves points by about 100 pixels; at the corners it is about $0.73$, a shift of about 160 pixels. Ignoring distortion is therefore not an option.
+$k_1$ produces \emph{barrel} distortion (\cref{fig:distortion}). At the middle of the left and right image edges the radial factor $1 + k_1r^2 + k_2r^4$ is $0.79$ and $0.77$,
+which moves points by 100 and 115 pixels; at the corners it is $0.73$, a shift of about 165 pixels. Ignoring distortion is therefore not an option.
 
 \begin{figure}[t]
   \centering

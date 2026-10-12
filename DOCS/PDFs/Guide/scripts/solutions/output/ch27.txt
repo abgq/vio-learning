@@ -1,0 +1,17 @@
+27.1 max FD errors: 3.371297685461627e-11 1.2016165840122994e-10 3.371297685461627e-11  z = 0.29999999999999993
+27.2 exact - approx: [-4.77631285e-06 -1.47879514e-06]  predicted -1/2 v w dt^2 R e1: [-4.77668245e-06 -1.47760103e-06]  norm 4.999999947916848e-06
+27.3 observability matrix rows 24 singular values [0.007815 0.       0.       0.      ]
+     nullspace basis (dp_x, dp_y, dpsi, db):
+ [[-0.0501 -0.0015  0.9987 -0.    ]
+ [-0.9968  0.0629 -0.0499  0.    ]
+ [-0.0627 -0.998  -0.0046 -0.    ]]
+     bias component of nullspace vectors: 1.1394097471084663e-14
+27.4 z = [np.float64(0.25), np.float64(0.0), np.float64(-0.5)]  Hf = [[-0.0625, 0.25], [-0.0, 0.25], [0.125, 0.25]]  a = [-0.03125   0.046875 -0.015625] normalized [-0.53452248  0.80178373 -0.26726124] a*sqrt14 = [-2.  3. -1.]
+     Ho*sqrt(14) = [-0.125  0.5    2.125  0.    -0.75  -3.     0.125  0.25   1.25 ]
+     middle clone truly at y=0.0: r_o = 0.00000; image-displacement ratio (z1-z2)/(z2-z3) = 0.5000; baseline ratio estimate 1/2
+     middle clone truly at y=0.1: r_o = -0.02004; image-displacement ratio (z1-z2)/(z2-z3) = 0.5789; baseline ratio estimate 1/2
+27.5 Ho*sqrt6 = [-0.0625  0.25    1.0625  0.     -0.5    -2.      0.0625  0.25    1.0625]  middle along x: 0.0  first along x: -0.025515518153991442
+N=3: features used 23, sigma(bias) from one window 0.2525 rad/s; heading-ramp over window 0.2 s -> equivalent heading-difference std 0.05050 rad; odometry heading-difference std over window 0.0089 rad
+N=5: features used 24, sigma(bias) from one window 0.0552 rad/s; heading-ramp over window 0.4 s -> equivalent heading-difference std 0.02208 rad; odometry heading-difference std over window 0.0126 rad
+N=10: features used 25, sigma(bias) from one window 0.0093 rad/s; heading-ramp over window 0.9 s -> equivalent heading-difference std 0.00834 rad; odometry heading-difference std over window 0.0190 rad
+N=20: features used 29, sigma(bias) from one window 0.0016 rad/s; heading-ramp over window 1.9 s -> equivalent heading-difference std 0.00305 rad; odometry heading-difference std over window 0.0276 rad

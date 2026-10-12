@@ -1,0 +1,14 @@
+parallax 0.25 deg (b =   2.2 cm): robust rel. std   50.5%, first order   70.8%, negative depths 7.74%, beyond 5 sigma 11.00% (Gaussian: 0.00006%)
+parallax 0.50 deg (b =   4.4 cm): robust rel. std   33.5%, first order   35.4%, negative depths 0.24%, beyond 5 sigma 3.60% (Gaussian: 0.00006%)
+parallax 1.00 deg (b =   8.7 cm): robust rel. std   17.5%, first order   17.7%, negative depths 0.00%, beyond 5 sigma 0.38% (Gaussian: 0.00006%)
+parallax 2.00 deg (b =  17.5 cm): robust rel. std    8.8%, first order    8.8%, negative depths 0.00%, beyond 5 sigma 0.03% (Gaussian: 0.00006%)
+parallax 4.00 deg (b =  34.9 cm): robust rel. std    4.4%, first order    4.4%, negative depths 0.00%, beyond 5 sigma 0.00% (Gaussian: 0.00006%)
+RANSAC s = 8 [9, 78, 1177]
+RANSAC s = 5 [6, 26, 146]
+RANSAC s = 2 [3, 7, 17]
+left edge middle  : radial factor 0.785, ideal point lies 100 px further out
+right edge middle : radial factor 0.768, ideal point lies 116 px further out
+top edge middle   : radial factor 0.908, ideal point lies 25 px further out
+corner (0,0)      : radial factor 0.730, ideal point lies 164 px further out
+corner (751,479)  : radial factor 0.730, ideal point lies 166 px further out
+motion blur f w T = 2.29 px; time offset 1 ms at 0.5/s = 0.0005 normalized = 0.229327 px

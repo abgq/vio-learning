@@ -1,0 +1,13 @@
+24.1 EKF-SLAM n = 615  P entries 378225  memory 3.0258 MB
+     per observation (rank-2 update, sparse H): 1.55718 Mflop; 100 observations per frame: 155.718 Mflop; at 20 Hz: 3.11436 Gflop/s
+     dense Joseph form per update: ~ 930.4335 Mflop
+     MSCKF n = 75  P entries 5625  memory 45.0 kB
+     stacked rows d = 450
+     MSCKF: QR compression 4.78 Mflop, update with d=n=75: 6.05 Mflop, total 10.8 Mflop
+     per-feature projection ~5 kflop, 50 features 0.27 Mflop
+24.3 correct posterior covariance (x1,x2): [[1.0, 1.0], [1.0, 1.5]]
+     wrong filter: claimed var 0.6667, actual var 1.5556, optimal 1.5000
+     MC actual var of wrong filter: 1.552969901619067
+     after 1 anchored relative updates: claimed var 0.667, actual var 1.552
+     after 5 anchored relative updates: claimed var 0.618, actual var 3.665
+     after 20 anchored relative updates: claimed var 0.618, actual var 11.603

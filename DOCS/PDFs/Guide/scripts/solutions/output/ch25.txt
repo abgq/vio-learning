@@ -1,0 +1,27 @@
+25.1 posterior (x2, xc): [[1.5, 1.0], [1.0, 1.0]]  formula P+Q-Q^2/(Q+R) = 1.5
+     after absolute fix of x2: P = [[0.6667, 0.3333], [0.3333, 0.6667]]  relative-measurement gain [ 0.2 -0.2]
+     clone variance after relative update: 0.6
+25.2 prior covariance (x3, xc1, xc2):
+ [[3. 1. 2.]
+ [1. 1. 1.]
+ [2. 1. 2.]]
+     chain, batch == sequential: True
+     posterior (chain):
+ [[2.  1.  1.5]
+ [1.  1.  1. ]
+ [1.5 1.  1.5]]
+     anchored with correlated noise == chain: True  Rp = [[2.0, 1.0], [1.0, 1.0]]
+     anchored sequential after decorrelation == chain: True  H''= [[-0.5 -0.5  1. ]] R''= [[0.5]]
+     anchored, correlation dropped: posterior variances [1.8571 1.     1.4286] vs correct [2.  1.  1.5]
+     info about relative displacements (H^T R^-1 H) chain vs dropped:
+ [[ 1.  0. -1.]
+ [ 0.  1. -1.]
+ [-1. -1.  2.]] 
+ [[ 0.5 -0.5  0. ]
+ [-0.5  1.5 -1. ]
+ [ 0.  -1.   1. ]]
+25.3 in-place result equals reference: True
+     descending row shift equals reference? False
+25.4 N=10 n=75 d=450: without QR 108.0 Mflop, with QR 11.0 Mflop (projection 0.27 Mflop)
+25.4 N=20 n=135 d=450: without QR 198.8 Mflop, with QR 50.2 Mflop (projection 0.27 Mflop)
+25.4 N=30 n=195 d=450: without QR 320.7 Mflop, with QR 135.8 Mflop (projection 0.27 Mflop)

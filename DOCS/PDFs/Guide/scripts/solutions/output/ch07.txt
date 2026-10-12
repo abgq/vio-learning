@@ -1,0 +1,6 @@
+7.7         0: Shepperd err 0.0e+00   naive err 0.0e+00
+7.7        90: Shepperd err 3.3e-16   naive err 3.3e-16
+7.7  179.9999: Shepperd err 2.3e-18   naive err 9.1e-06
+7.7       180: Shepperd err 1.3e-16   naive err nan
+7.9 optical axis in body: [0.0041403  0.02571553 0.99966073]  angle to body z: 1.492534728992109 deg
+    camera x in body: [ 0.01486554  0.99955725 -0.02577444]  camera y in body: [-0.99988093  0.01496721  0.00375619]

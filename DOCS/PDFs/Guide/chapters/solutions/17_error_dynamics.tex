@@ -58,12 +58,12 @@
         \toprule
         runs $M$ & 100 & 200 & 500 & 700 \\
         \midrule
-        power against $\sigma_a$ 10\% too small (ratio 1.21) & 0.30 & 0.50 & 0.86 & 0.95 \\
-        power against $\sigma_a$ 10\% too large (ratio 0.81) & 0.29 & 0.53 & 0.91 & 0.98 \\
+        power against $\sigma_a$ 10\% too small (ratio 1.21) & 0.29 & 0.50 & 0.86 & 0.95 \\
+        power against $\sigma_a$ 10\% too large (ratio 0.81) & 0.28 & 0.53 & 0.91 & 0.98 \\
         \bottomrule
         \end{tabular}
         \end{center}
-        About 600--700 runs are needed to detect a 10\% error with 95\% probability (by the normal approximation, the interval half-width
+        Detecting a 10\% error with 95\% probability takes 600 runs if $\sigma_a$ is too large and 720 if it is too small (by the normal approximation, the interval half-width
         $1.96\sqrt{2/M}$ plus $1.645$ times the alternative's spread must be below $0.21$). Two practical remedies: test several independent quantities at
         once (the three axes, several times along the trajectory), which multiplies the effective number of samples, and use larger errors when the
         purpose is only to show that the test can fail.

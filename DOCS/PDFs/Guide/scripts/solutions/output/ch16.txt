@@ -1,0 +1,10 @@
+16.1 R err 1.6653345369377348e-15  v err 8.43769498715119e-15  p err 8.049116928532385e-15
+16.2 relative velocity-increment error: 0.002499998263889876  predicted 0.5|w|dt = 0.0025
+16.3 euler ['7.8e+00', '3.9e+00', '2.0e+00', '9.9e-01', '4.9e-01', '2.5e-01', '1.2e-01']
+16.3 midpoint ['4.5e-02', '1.1e-02', '2.8e-03', '7.0e-04', '1.8e-04', '4.4e-05', '1.1e-05']
+16.3 rk4lin ['2.2e-02', '5.4e-03', '1.4e-03', '3.4e-04', '8.5e-05', '2.1e-05', '5.3e-06']
+16.3 noise-induced rms position error after 10 s at 100 Hz: 0.168 m
+16.3 noise-induced rms position error after 10 s at 200 Hz: 0.192 m
+16.3 noise-induced rms position error after 10 s at 800 Hz: 0.163 m
+16.4 tilt error without bias [mrad]: 0.21653286225664595
+16.4 tilt error with |b|=0.05 [mrad]: 4.914820070345008  predicted |b_horiz|/g = 5.089854917199663

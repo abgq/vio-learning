@@ -1,0 +1,7 @@
+29.1 scale 1e-03: |x' boxminus x - N[t; a]| = 3.59e-05, entries of N[t; a] up to 3.25e-02
+29.1 scale 1e-05: |x' boxminus x - N[t; a]| = 2.31e-10, entries of N[t; a] up to 5.56e-05
+29.3 L_fv h = [-1. -0. -1. -0.]  (expect -e1 for each landmark)
+     max |L_fw h - (-Omega h)| = 1.7262014040397844e-10
+     singular values of the stacked gradients: [12.223337  3.        2.256108  1.732051  0.        0.        0.      ]
+     nullspace = span(translations, rotation): residual 1.2420686701375416e-10
+29.4 det J_z = 0.3094922302950865  1/rho = 0.30949223029508643

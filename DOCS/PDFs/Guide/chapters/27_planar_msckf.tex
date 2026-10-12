@@ -479,7 +479,7 @@ uncertainty is perpendicular to the direction of travel, which rotates as the ro
 The results (\cref{fig:planar-traj,fig:planar-err,fig:planar-nees}) illustrate four points.
 \begin{enumerate}
   \item \textbf{The camera helps, mostly through the heading.} Odometry alone accumulates a heading error with standard deviation
-        $\sigma_\omega\sqrt{t} = \SI{0.19}{rad}$ after \SI{90}{s}. The MSCKF ends at \SI{0.067}{rad}: the camera measures the relative rotation between clones far
+        $\sigma_\omega\sqrt{t} = \SI{0.19}{rad}$ after \SI{90}{s}. The MSCKF ends at about \SI{0.07}{rad}: the camera measures the relative rotation between clones far
         better than the gyro-like turn rate, and because heading errors turn into cross-track position errors, the position error drops by a
         factor of 2.5.
   \item \textbf{The error still grows.} Even with the camera, the heading and position uncertainties grow without bound (\cref{fig:planar-err}).
@@ -487,9 +487,9 @@ The results (\cref{fig:planar-traj,fig:planar-err,fig:planar-nees}) illustrate f
         closures can only slow their drift, never stop it. The along-track error is set by the odometry speed noise alone, since a monocular camera
         cannot measure scale (the worked example above).
   \item \textbf{The filter is consistent.} The errors stay inside their $3\sigma$ envelopes, and the average NEES stays inside its acceptance
-        interval, apart from a brief, mildly conservative dip below it around \SI{25}{s}. The gate rejected 5.2\% of the features, close to the 5\% that a $\chi^2_{0.95}$ gate should reject when the filter is
+        interval, apart from mildly conservative dips below it between about 12 and \SI{28}{s}. The gate rejected 5.2\% of the features, close to the 5\% that a $\chi^2_{0.95}$ gate should reject when the filter is
         consistent and every feature is a good one; a much larger rate would signal an overconfident filter or bad data.
-  \item \textbf{But the NEES creeps upward.} In the second half of the run the average NEES drifts from about 2.7 to 3.4. It is still inside the
+  \item \textbf{But the NEES creeps upward.} In the second half of the run its 15-second averages rise steadily, from 2.75 to 2.86 to 3.05, with peaks near 3.5. It is still inside the
         interval, but the trend is systematic: the filter is beginning to believe it knows the heading better than it does. The mechanism, and its cure, are the subject of \cref{ch:observability}.
 \end{enumerate}
 

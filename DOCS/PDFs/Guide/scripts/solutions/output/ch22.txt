@@ -1,0 +1,17 @@
+22.1 edge: M = [[7.5, 0.0], [0.0, 0.0]], eigenvalues [0.  7.5]
+22.1 corner: M = [[4.0, 0.25], [0.25, 4.0]], eigenvalues [3.75 4.25]
+     normals at 90 deg: eigenvalues of n1n1T+n2n2T [1. 1.] 1-cos = 0.9999999999999999
+     normals at 45 deg: eigenvalues of n1n1T+n2n2T [0.29289322 1.70710678] 1-cos = 0.2928932188134524
+     normals at 20 deg: eigenvalues of n1n1T+n2n2T [0.06030738 1.93969262] 1-cos = 0.06030737921409157
+22.2 tr^2-4det = 0.0  (a-c)^2+4b^2 = 5.000000165480749e-18
+22.3 shift (0.3,-0.7): errors per iteration ['7.6e-01', '2.2e-02', '1.0e-02', '9.9e-03', '9.9e-03', '9.9e-03', '9.9e-03', '9.9e-03', '9.9e-03']
+22.3 shift (8.0, 0.0): success rate (err<0.1px) with 0..3 pyramid levels above the base: [0.44 0.98 1.   1.  ]
+22.3 shift (5.66, -5.66): success rate (err<0.1px) with 0..3 pyramid levels above the base: [0.41 0.96 1.   1.  ]
+22.3 shift (0.0, 8.0): success rate (err<0.1px) with 0..3 pyramid levels above the base: [0.31 0.93 1.   1.  ]
+     autocorrelation at lag 1..8 px: [0.933 0.777 0.583 0.399 0.256 0.163 0.108 0.08 ]
+22.4 sigma_I=0.01: FB error median 0.0010 px, 95% 0.0032, 99% 0.0048, max 0.0086; forward error median 0.0317
+     predicted per-axis std of one track sigma/sqrt(lambda) ~ [0.02386464 0.01868495] (last window)
+     noise-free FB error (interpolation only): median 0.0001, max 0.0007 px
+     occluded (half window replaced) FB error: median 1.702 px, fraction > 0.5 px: 0.84, > 0.1 px: 0.97
+22.5 predicted pixel: [344.26317029 248.375        1.        ]  displacement -22.951829713274265 -5.684341886080802e-14  fu*tan: 22.951829713274368
+     translation 1 m/s over 50 ms at 5 m depth: 4.58654 px

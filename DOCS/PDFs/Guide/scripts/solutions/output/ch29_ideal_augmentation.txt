@@ -1,0 +1,4 @@
+ideal, true-state augmentation  : final NEES 3.34, RMS heading 2.79 deg, filter sigma 2.90 deg, variance / MSE 1.08
+ideal, noisy augmentation       : final NEES 3.26, RMS heading 2.54 deg, filter sigma 2.77 deg, variance / MSE 1.19
+FEJ                             : final NEES 3.35, RMS heading 2.78 deg, filter sigma 2.90 deg, variance / MSE 1.09
+standard                        : final NEES 5.38, RMS heading 2.95 deg, filter sigma 1.81 deg, variance / MSE 0.38

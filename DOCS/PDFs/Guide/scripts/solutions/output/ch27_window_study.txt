@@ -1,0 +1,7 @@
+N_max= 3: final RMS position 2.225 m, final RMS heading 0.1897 rad, mean NEES last 9 s 2.65, rejection rate 0.047, time 80 s
+N_max= 5: final RMS position 2.128 m, final RMS heading 0.1735 rad, mean NEES last 9 s 2.97, rejection rate 0.052, time 78 s
+N_max=10: final RMS position 0.853 m, final RMS heading 0.0693 rad, mean NEES last 9 s 3.14, rejection rate 0.052, time 74 s
+N_max=20: final RMS position 0.327 m, final RMS heading 0.0253 rad, mean NEES last 9 s 3.20, rejection rate 0.050, time 80 s
+N_max=40: final RMS position 0.181 m, final RMS heading 0.0120 rad, mean NEES last 9 s 3.03, rejection rate 0.048, time 81 s
+N_max=80: final RMS position 0.174 m, final RMS heading 0.0117 rad, mean NEES last 9 s 3.24, rejection rate 0.050, time 114 s
+visibility runs: median 68 frames (6.8 s), mean 70.5 frames; landmarks visible per frame 23.3

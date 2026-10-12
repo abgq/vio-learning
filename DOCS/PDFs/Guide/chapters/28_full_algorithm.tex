@@ -105,11 +105,11 @@ With $N = 10$ clones the error state has $n = 75$ dimensions. Rough flop counts 
 Operation & Frequency & Cost (flops) \\
 \midrule
 Nominal propagation & 200 Hz & $\sim10^2$ \\
-$P_{II}$, $P_{IC}$ propagation & 200 Hz & $\sim2\times10^4$ \\
+$P_{II}$, $P_{IC}$ propagation & 200 Hz & $\sim4\times10^4$ \\
 Cloning ($P \gets JPJ\T$ as block copies) & 20 Hz & $\sim10^4$ \\
 Per feature: triangulation, projection, gating ($M = 6$) & per track & $\sim10^5$ \\
 QR compression of $d = 450$ rows & per update & $\sim5\times10^6$ \\
-Update ($S$, gain, Joseph) with $n = 75$ & per update & $\sim3\times10^6$ \\
+Update ($S$, gain, Joseph) with $n = 75$ & per update & $\sim6\times10^6$ \\
 Front end (KLT on 150 features) & 20 Hz & dominant in time \\
 \bottomrule
 \end{tabular}

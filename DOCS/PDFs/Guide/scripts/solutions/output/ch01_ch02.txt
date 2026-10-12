@@ -1,0 +1,11 @@
+1.1 ba=0.04905 m/s2, t=6.386 s, bg=2.3491e-03 rad/s = 0.1346 deg/s = 484.5 deg/h; check 3ba/(g t)=2.3491e-03
+1.2 tilt for 1% error (horizontal component): 0.2441 rad = 13.99 deg
+    vs magnitude 2g sin(th/2): 0.4882 rad = 27.97 deg
+2.2 det 0.0 combo [0. 0. 0.]
+2.3 [[ 1.  1.  0.]
+ [ 1. -1.  2.]
+ [-1.  1.  1.]] 
+ orthonormal: True
+2.5 Jacobi residual 6.546139416680338e-17
+2.8 [1. 3.] [[-0.70710678  0.70710678]
+ [ 0.70710678  0.70710678]]

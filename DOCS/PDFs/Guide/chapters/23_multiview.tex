@@ -293,13 +293,14 @@ Depth error grows quadratically with depth and inversely with baseline. Equivale
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.86\textwidth]{fig_triangulation.pdf}
-  \caption{Relative depth error of two-view triangulation at $Z = 5$~m with 1-pixel noise, versus parallax angle. Above about $2^\circ$ the first-order formula \eqref{eq:depth-sigma}
-  is accurate. Below about $1^\circ$ the error distribution becomes heavy-tailed (depths can even become negative), and the estimate is unusable.}
+  \caption{Relative depth error of two-view triangulation at $Z = 5$~m with 1-pixel noise, versus parallax angle. Down to about $1^\circ$ the first-order formula \eqref{eq:depth-sigma}
+  describes the spread accurately. Below that the error distribution becomes heavy-tailed (depths can even become negative), and the estimate is unusable.}
   \label{fig:triangulation}
 \end{figure}
 
-\Cref{fig:triangulation} shows that 10\% depth accuracy needs about $2^\circ$ of parallax, a baseline of 17~cm at 5~m. Below about $1^\circ$ the linearization behind
-\eqref{eq:depth-sigma} breaks down entirely. A triangulation module must therefore check its own result before handing it to the filter:
+\Cref{fig:triangulation} shows that 10\% depth accuracy needs about $2^\circ$ of parallax, a baseline of 17~cm at 5~m. Down to about $1^\circ$ \eqref{eq:depth-sigma} still
+describes the bulk of the estimates; below that, outliers take over. At $0.5^\circ$, 4\% of the estimates are off by more than five standard deviations, and at
+$0.25^\circ$, 8\% of the depths come out negative. A triangulation module must therefore check its own result before handing it to the filter:
 \begin{itemize}
   \item positive depth in every view (cheirality);
   \item sufficient parallax (or baseline relative to depth), or equivalently a well-conditioned Gauss--Newton Hessian;

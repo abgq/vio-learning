@@ -1,0 +1,9 @@
+19.1 single-run 95% quantile chi2(15): 24.995790139728616  two-sided single-run interval: 6.262137795043253 27.488392863442975  50-run average interval: 13.520052285415172 16.555705408018294
+19.2 consistent: mean NEES (2 DOF)   1.93   mean NIS (1 DOF)  1.00
+19.2 Q/20      : mean NEES (2 DOF)  19.96   mean NIS (1 DOF)  1.53
+19.2 20Q       : mean NEES (2 DOF)   1.08   mean NIS (1 DOF)  0.87
+19.2 R/20      : mean NEES (2 DOF)  21.65   mean NIS (1 DOF) 17.49
+19.2 20R       : mean NEES (2 DOF)   1.03   mean NIS (1 DOF)  0.08
+     50-run bands: NEES 1.4844385494984746 2.5912239437167317  NIS 0.6471472739131731 1.4284039037501284
+19.5 RPE translation per 10 m segment: 0.014398962978565228 m; rotation per segment 0.16666666666666666 deg
+19.5 final error 52.3 m, ATE without alignment 23.4 m, ATE after rigid alignment 3.90 m

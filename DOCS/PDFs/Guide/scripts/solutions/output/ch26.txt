@@ -1,0 +1,18 @@
+26.1 projected vs augmented-state update with prior lambda on p_f:
+     lambda=1e+02: max |dP| 5.06e-02, max |d dx| 9.55e-03
+     lambda=1e+04: max |dP| 6.25e-04, max |d dx| 1.04e-04
+     lambda=1e+06: max |dP| 6.27e-06, max |d dx| 1.04e-06
+     lambda=1e+08: max |dP| 6.26e-08, max |d dx| 1.04e-08
+     lambda=1e+10: max |dP| 2.83e-08, max |d dx| 6.42e-09
+26.2 feature correction from discarded rows vs augmented update: 5.699221544697153e-08
+     feature covariance vs augmented: 1.0188733908999636  cross-cov: 1.9632935252533734e-07
+26.3 |g^T H_f| / (|g| |H_f|) = 5.976061738861552e-11  (finite-difference precision)
+     QR null vector vs g/|g|: |cos| = 1.0
+26.4 M=3: |Ho_house - Ho_QR| = 8.9e-16 (up to row signs); info equal (SVD basis): True, gate stats 0.127309 0.127309; flops house ~1368, explicit ~900; rows 4.. of Hf after reflections max 2.6e-16
+26.4 M=6: |Ho_house - Ho_QR| = 1.3e-15 (up to row signs); info equal (SVD basis): True, gate stats 0.487895 0.487895; flops house ~5328, explicit ~8856; rows 4.. of Hf after reflections max 5.3e-16
+26.4 M=10: |Ho_house - Ho_QR| = 1.3e-15 (up to row signs); info equal (SVD basis): True, gate stats 0.139178 0.139178; flops house ~14640, explicit ~43880; rows 4.. of Hf after reflections max 6.6e-16
+26.5 projected noise covariance is sigma^2 I: True
+lambda=1e+04: Joseph Pff rel diff 2.30e-03; info-form Pff rel diff 2.30e-03
+lambda=1e+06: Joseph Pff rel diff 2.31e-05; info-form Pff rel diff 2.31e-05
+lambda=1e+08: Joseph Pff rel diff 2.31e-07; info-form Pff rel diff 2.31e-07
+Pff diag [19.33137506 13.95316637  8.78035281]

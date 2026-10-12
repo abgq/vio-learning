@@ -143,8 +143,9 @@ $a, b \in [0, 1)$:
   with $I_{ij} = I[u_0 + i, v_0 + j]$. The result is continuous, and the weights are the areas of the rectangles opposite each corner;
   \item \emph{bicubic} interpolation fits a smooth cubic patch to a $4\times4$ neighborhood; it has continuous derivatives at the cost of 16 pixels per sample.
 \end{itemize}
-Lucas--Kanade trackers use bilinear interpolation for both the image and its gradients. With images represented as 8-bit integers, implementations use fixed-point
-weights for speed, which limits the attainable sub-pixel resolution to a few hundredths of a pixel, well below the noise of real tracking.
+Lucas--Kanade trackers use bilinear interpolation for both the image and its gradients. OpenCV's tracker works on 8-bit images with 14-bit fixed-point
+interpolation weights. On a noise-free synthetic image shifted by a known sub-pixel amount it is accurate to about a hundredth of a pixel, whatever its stopping
+threshold. The limit comes from the 8-bit intensities and the bilinear model, not from the arithmetic, and it lies well below the noise of real tracking.
 
 % ==============================================================================
 \section{Finding local maxima}

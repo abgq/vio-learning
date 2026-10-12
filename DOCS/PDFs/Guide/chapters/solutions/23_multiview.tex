@@ -47,11 +47,16 @@
 
   \item With $t = 0$, every correspondence satisfies $\bar x_2 \propto R\bar x_1$, so $\bar x_2\T\sx{t}R\bar x_1 = \bar x_2\T(t\times R\bar x_1) = 0$ for \emph{every} $t$. The data fit the
         whole family $E = \sx{t}R$, and the eight-point matrix $A$ has three singular values at the noise level instead of one. In simulation, a randomly chosen
-        $t$ combined with the true $R$ fits 68--70\% of the tracks to within 1~px, exactly the fraction the true model fits with 1-pixel noise. Whatever
-        \code{cv::findEssentialMat} returns therefore has an arbitrary translation direction that changes from run to run, and its inlier set is no test of the
-        tracks, since the free $t$ can turn epipolar lines through outliers. The parallax test: the median of $\|\pi(R\bar x_1) - \pi(\bar x_2)\|$ over the tracks was
-        $1.6$~px under pure rotation (noise only) and $8.8$~px for a 10~cm sideways motion with points at 3--8~m. A threshold of a few pixels separates the two
-        regimes. Below it, check tracks only against $\bar x_2 \propto R\bar x_1$.
+        $t$ combined with the true $R$ fits 68--70\% of the tracks to within 1~px, exactly the fraction the true model fits with 1-pixel noise.
+
+        Running \code{cv::findEssentialMat} (RANSAC, 2~px threshold) on 150 synthetic tracks, 30 of them wrong by about 40~px, with four random seeds gave four unrelated
+        translation directions, for example $(-0.33, 0.21, 0.92)$ and $(-0.16, 0.31, -0.94)$. The rotation returned by \code{cv::recoverPose} was still accurate to
+        $0.1$--$0.3^\circ$. Nothing else in the output signals the problem: 112--118 of the 150 tracks were inliers and 2--4 of the wrong ones slipped in, much as for a
+        camera translating 10~cm sideways (105--113 inliers, 0--5 wrong ones accepted). Only the translation is garbage, and it looks like any other answer.
+        (At that small parallax even the translating case is fragile: two of its four seeds put $t$ more than $40^\circ$ off.) The parallax test detects the situation.
+        The median of $\|\pi(R\bar x_1) - \pi(\bar x_2)\|$ over the good tracks was 1.5--1.8~px under pure rotation (noise only) and 8.4--9.3~px for the sideways motion with points at
+        3--8~m. A threshold of a few pixels separates the two regimes. Below it, check tracks only against $\bar x_2 \propto R\bar x_1$
+        (\code{scripts/solutions/ch23\_opencv.py}).
 
   \item The matrix $\sx{\bar x_i}$ has rank two (its nullspace is $\bar x_i$), and multiplying by the invertible $R_{wc_i}\T$ keeps the rank, so each view contributes three
         equations of rank two. For two views, $p$ is in the nullspace of the stacked matrix if and only if $R_{wc_i}\T p \parallel \bar x_i$ for both views, i.e.\ $p$ is parallel to both ray

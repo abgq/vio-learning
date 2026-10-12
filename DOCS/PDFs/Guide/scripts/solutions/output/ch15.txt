@@ -1,0 +1,5 @@
+15.1 f = R^T (0, 0, g) = [0.    1.703 9.661]
+15.2 1/wn^2 = 1.01e-09 m per m/s^2; 1 g deflects 9.9 nm; noise 2e-3 * sqrt(100 Hz) = 0.020 m/s^2 -> 2.0e-11 m
+15.4 bias 0.020 m/s^2, 1 + s = 1.0000
+15.5 1 deg/sqrt(h) = 2.9089e-04 rad/s/sqrt(Hz); 0.2 deg/sqrt(h) = 5.818e-05; per-sample std at 400 Hz 1.164e-03 rad/s; EuRoC 1.6968e-4 is 2.92 times larger
+15.6 equivalent bias at 1 rad/s: 1e-03 rad/s = 0.057 deg/s; attitude error per full turn 2*pi*s = 6.3 mrad

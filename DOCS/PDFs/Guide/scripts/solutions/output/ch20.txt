@@ -1,0 +1,33 @@
+20.1 z_i = 4.03226 mm, shift = 32.26 um, approx f^2/z_o = 32.00 um
+jac check 2.9783757404810984e-10
+20.2 [pixel centers 0..W-1] no distortion: H 78.60 deg, V 55.27 deg; with distortion: H 93.02, V 59.57
+     left/right half-angles no-dist 38.68 39.92, dist 45.56 47.46
+     top/bottom half-angles no-dist 28.51 26.76, dist 30.90 28.67
+20.2 [sensor edges -0.5..W-0.5] no distortion: H 78.68 deg, V 55.37 deg; with distortion: H 93.13, V 59.69
+     left/right half-angles no-dist 38.72 39.96, dist 45.62 47.52
+     top/bottom half-angles no-dist 28.56 26.81, dist 30.96 28.74
+20.2 symmetric formula 2 atan(W/2fu) = 78.68912031217285  2 atan(H/2fv) = 55.38315061445156
+     corner distorted r=0.9675 (44.05 deg) undistorted r=1.3255 (52.97 deg)
+     corner distorted r=0.9770 (44.33 deg) undistorted r=1.3381 (53.23 deg)
+20.5 iteration counts to 1e-6 accuracy (normalized units)
+  pixel (0,0): r_d=0.9675, r=1.3255, residual 0.0e+00; fixed-point 7 iters (ratio ~[0.205 0.135 0.117 0.115 0.114 0.114]), Gauss-Newton 3 iters, GN errors ['1.0e-02', '1.0e-04', '9.1e-09']
+     first fixed-point errors ['1.2e-01', '2.4e-02', '3.2e-03', '3.7e-04', '4.3e-05']
+  pixel (751,0): r_d=0.9976, r=1.3699, residual 1.1e-16; fixed-point 5 iters (ratio ~[0.133 0.046 0.032 0.031]), Gauss-Newton 3 iters, GN errors ['2.9e-02', '9.1e-04', '8.6e-07']
+     first fixed-point errors ['1.1e-01', '1.4e-02', '6.6e-04', '2.1e-05', '6.6e-07']
+  pixel (0,479): r_d=0.9462, r=1.2900, residual 0.0e+00; fixed-point 8 iters (ratio ~[0.246 0.19  0.172 0.169 0.168 0.168]), Gauss-Newton 2 iters, GN errors ['6.9e-04', '3.8e-07']
+     first fixed-point errors ['1.2e-01', '2.8e-02', '5.4e-03', '9.3e-04', '1.6e-04']
+  pixel (751,479): r_d=0.9770, r=1.3381, residual 0.0e+00; fixed-point 7 iters (ratio ~[0.183 0.109 0.092 0.09  0.09  0.09 ]), Gauss-Newton 3 iters, GN errors ['1.6e-02', '2.3e-04', '5.3e-08']
+     first fixed-point errors ['1.1e-01', '2.1e-02', '2.2e-03', '2.1e-04', '1.9e-05']
+  pixel (367,0): r_d=0.5431, r=0.5984, residual 0.0e+00; fixed-point 7 iters (ratio ~[0.181 0.182 0.182 0.183 0.183 0.183]), Gauss-Newton 2 iters, GN errors ['1.4e-03', '8.7e-07']
+     first fixed-point errors ['9.7e-03', '1.7e-03', '3.2e-04', '5.8e-05', '1.1e-05']
+  pixel (0,248): r_d=0.8006, r=1.0196, residual 1.9e-20; fixed-point 12 iters (ratio ~[0.349 0.346 0.344 0.344 0.343 0.343]), Gauss-Newton 3 iters, GN errors ['1.9e-02', '7.3e-05', '8.5e-10']
+     first fixed-point errors ['7.6e-02', '2.7e-02', '9.2e-03', '3.2e-03', '1.1e-03']
+  fixed-point error after 5 iterations at corner (0,0): 4.286635439383435e-05  =  0.0196608249081497 px; after 10: 8.420492070793048e-10 = 3.8620923702375144e-07 px
+20.7 translational image velocity v/Z = 0.1 rad/s = 46 px/s; rotational ~ w = 1.0 rad/s = 459 px/s
+0 248.375 after 5: 0.0010906381594165437 0.5002255543690354 px
+751 248.375 after 5: 0.001219098936357298 0.5591446035560201 px
+0 0 after 5: 4.286635439383435e-05 0.0196608249081497 px
+max contraction factor 0.3432349102150873 at r = 1.0167
+diagonal FOV, pinhole 88.43499795486336 88.43450003665244
+diagonal FOV, distortion 106.23612856335467 106.17854306121652
+blur spot diameter 15.999999999999904 um = 2.6666666666666505 pixels of 6 um

@@ -1,0 +1,26 @@
+8.3 theta, err_acos, err_atan2
+    1e-02: 2.4e-12 1.7e-16
+    1e-04: 2.6e-09 0.0e+00
+    1e-06: 4.4e-05 0.0e+00
+    1e-08: 1.0e+00 0.0e+00
+    1e-10: 1.0e+00 0.0e+00
+8.3 near pi theta=pi-1e-06: near-pi branch err 0.0e+00, naive skew-part err 1.7e-10
+8.3 near pi theta=pi-0e+00: near-pi branch err 6.7e-16, naive skew-part err 1.2e+01
+8.4 scheme max abs error on [0,0.1]: 1.1e-15; naive closed form max error: 3.5e-09
+    t=0.019: closed-form error 1.5e-16, u/t = 5.8e-15
+    t=0.02: closed-form error 7.4e-16, u/t = 5.6e-15
+    t=0.05: closed-form error 4.9e-16, u/t = 2.2e-15
+    t=0.1: closed-form error 3.8e-16, u/t = 1.1e-15
+8.7 [[9. 0. 0.]
+ [0. 1. 0.]
+ [0. 0. 1.]]
+8.8 Rv         max error 1.2e-10
+8.8 R^T v      max error 5.5e-11
+8.8 R^-1       max error 2.0e-11
+8.8 R1R2 (R1)  max error 2.2e-11
+8.8 R1R2 (R2)  max error 2.3e-11
+8.8 Exp        max error 1.0e-10
+8.8 Log        max error 1.9e-10
+8.8 Exp(phi)v  max error 1.5e-10
+    flipped sign of Rv row: 2.917241470734414
+    |phi| = 1.6113519814983641

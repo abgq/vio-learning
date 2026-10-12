@@ -1,0 +1,4 @@
+updates: 4500; features per update: mean 2.4, 99th pct 7.0, max 22
+observation counts M: [  90  200  280  140   80  120   95 9785] (for M = 3..)  mean 9.60
+rows d per update: mean 18.2, median 16.0, 99th pct 56.0, 99.9th 152, max 175
+bound from visible features x (N_max - 2): 320

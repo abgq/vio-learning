@@ -1,0 +1,37 @@
+23.1 max |x2^T E x1| for inliers: 2.42861286636753e-17
+     outlier algebraic residual 0.007763489830332836  sqrt Sampson 0.011888796170303282 = 5.445068645998903 px
+     point-line distance in image 2: 7.665913571554876 px
+     inlier sqrt Sampson max: 2.888357409520104e-17
+23.2 t^T E = [-6.94630762e-19 -3.08721019e-18  2.00974341e-19]  E R^T t = [-4.71711307e-18  1.51633737e-17  8.31482513e-18]  singular values [5.00000000e-01 5.00000000e-01 5.12441177e-18] |t| = 0.49999999999999994
+23.3 median rotation error deg raw / normalized: 0.3282650089831112 0.15606293088244005
+     median translation direction error deg raw / normalized: 2.473187628876029 1.0649788023842104
+     90th pct rotation error raw / norm: 1.5559952416394691 0.3447855690321009
+     90th pct translation error raw / norm: 11.434726760902295 2.448157868309712
+     median condition sigma1/sigma8 raw / normalized: 154008.24280227552 66.27211355517275
+23.4 correct decomposition selected: 500 / 500
+     solution 0 points in front of both: 0 of 30 | front of 1 only: 30 | behind 1: 0
+     solution 1 points in front of both: 0 of 30 | front of 1 only: 0 | behind 1: 30
+     solution 2 points in front of both: 30 of 30 | front of 1 only: 0 | behind 1: 0
+     solution 3 points in front of both: 0 of 30 | front of 1 only: 0 | behind 1: 30
+23.5 iterations at w=0.7: 2-pt 7  5-pt 26  8-pt 78
+     2-pt RANSAC: mean iterations 9.8, classification accuracy 0.936, median t-direction error 1.64 deg
+     expected draws until first clean sample: 2-pt 2.0408163265306127  5-pt 5.949901826619863
+23.6 pure rotation: smallest four singular values of A [0.5658  0.02223 0.01921 0.00864], median rotation-compensated parallax 1.57 px
+     random t #0: fraction of tracks with Sampson distance < 1 px: 0.70
+     random t #1: fraction of tracks with Sampson distance < 1 px: 0.68
+     random t #2: fraction of tracks with Sampson distance < 1 px: 0.70
+23.6 10 cm sideways: smallest four singular values of A [0.566   0.03855 0.02092 0.01219], median rotation-compensated parallax 8.81 px
+23.8 parallax 1.0 deg (b=0.087 m), 2 views: robust rel std 0.177, linear prediction 0.177; two-view formula 0.177; negative depth 0.0000
+23.8 parallax 1.0 deg (b=0.087 m), 3 views: robust rel std 0.174, linear prediction 0.177; two-view formula 0.177; negative depth 0.0000
+23.8 parallax 1.0 deg (b=0.087 m), 5 views: robust rel std 0.159, linear prediction 0.158; two-view formula 0.177; negative depth 0.0000
+23.8 parallax 2.0 deg (b=0.175 m), 2 views: robust rel std 0.089, linear prediction 0.088; two-view formula 0.088; negative depth 0.0000
+23.8 parallax 2.0 deg (b=0.175 m), 3 views: robust rel std 0.088, linear prediction 0.088; two-view formula 0.088; negative depth 0.0000
+23.8 parallax 2.0 deg (b=0.175 m), 5 views: robust rel std 0.080, linear prediction 0.079; two-view formula 0.088; negative depth 0.0000
+23.8 parallax 5.0 deg (b=0.437 m), 2 views: robust rel std 0.036, linear prediction 0.035; two-view formula 0.035; negative depth 0.0000
+23.8 parallax 5.0 deg (b=0.437 m), 3 views: robust rel std 0.035, linear prediction 0.035; two-view formula 0.035; negative depth 0.0000
+23.8 parallax 5.0 deg (b=0.437 m), 5 views: robust rel std 0.032, linear prediction 0.032; two-view formula 0.035; negative depth 0.0000
+23.8 parallax 10.0 deg (b=0.882 m), 2 views: robust rel std 0.018, linear prediction 0.018; two-view formula 0.018; negative depth 0.0000
+23.8 parallax 10.0 deg (b=0.882 m), 3 views: robust rel std 0.017, linear prediction 0.018; two-view formula 0.018; negative depth 0.0000
+23.8 parallax 10.0 deg (b=0.882 m), 5 views: robust rel std 0.016, linear prediction 0.016; two-view formula 0.018; negative depth 0.0000
+23.5 iterations mean 9.8; inliers rejected 0.046; outliers accepted 0.013; t-direction error median: best hypothesis 1.64 deg, after refit 0.60 deg
+     expected inlier rejection at 2 sigma: 0.04550026389635839

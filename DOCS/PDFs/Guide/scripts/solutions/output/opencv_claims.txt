@@ -1,0 +1,8 @@
+OpenCV 5.0.0
+undistortPoints default: error vs converged (normalized) [1.09063816e-03 4.28663544e-05 1.85264493e-05], in px [0.50022555 0.01966082 0.00849723]
+undistortPoints 5 iterations explicit: error vs converged (normalized) [1.09063816e-03 4.28663544e-05 1.85264493e-05], in px [0.50022555 0.01966082 0.00849723]
+undistortPoints 200 iterations: error vs converged (normalized) [0. 0. 0.], in px [0. 0. 0.]
+LK eps=0.01: median error 0.0080 px, 90th pct 0.0142 px (8-bit images, no noise)
+LK eps=0.001: median error 0.0080 px, 90th pct 0.0142 px (8-bit images, no noise)
+LK eps=1e-05: median error 0.0081 px, 90th pct 0.0142 px (8-bit images, no noise)
+8-bit quantization step relative to typical gradient: 0.1624451898128872

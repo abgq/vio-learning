@@ -1,0 +1,10 @@
+== pure rotation
+  seed 0: t direction [-0.33  0.21  0.92], inliers 117/150 (wrong tracks accepted 2/30, good tracks rejected 5/120), rotation error 0.11 deg, median parallax 1.7 px
+  seed 1: t direction [ 0.22 -0.01  0.97], inliers 118/150 (wrong tracks accepted 3/30, good tracks rejected 5/120), rotation error 0.08 deg, median parallax 1.7 px
+  seed 2: t direction [-0.16  0.31 -0.94], inliers 112/150 (wrong tracks accepted 4/30, good tracks rejected 12/120), rotation error 0.27 deg, median parallax 1.8 px
+  seed 3: t direction [-0.21  0.11  0.97], inliers 118/150 (wrong tracks accepted 4/30, good tracks rejected 6/120), rotation error 0.13 deg, median parallax 1.5 px
+== 10 cm sideways
+  seed 0: t direction [-0.99  0.12  0.12], inliers 111/150 (wrong tracks accepted 2/30, good tracks rejected 11/120), rotation error 0.36 deg, median parallax 8.7 px
+  seed 1: t direction [-0.94 -0.29 -0.15], inliers 109/150 (wrong tracks accepted 1/30, good tracks rejected 12/120), rotation error 1.17 deg, median parallax 8.8 px
+  seed 2: t direction [-0.75 -0.06  0.66], inliers 113/150 (wrong tracks accepted 5/30, good tracks rejected 12/120), rotation error 0.85 deg, median parallax 8.4 px
+  seed 3: t direction [-0.5   0.26  0.82], inliers 105/150 (wrong tracks accepted 0/30, good tracks rejected 15/120), rotation error 0.99 deg, median parallax 9.3 px

@@ -1,0 +1,13 @@
+9.2 t from -5.0 : [[0.09091 0.     ]
+ [0.      0.00909]]  corr 0.0
+9.2 t from 0.0 : [[ 0.31818 -0.04545]
+ [-0.04545  0.00909]]  corr -0.8451542547285167
+9.5 max difference RLS vs batch: 2.6005864128819667e-12
+9.6 sigma=0.01: LMMSE gain 1.399, LMMSE rms 0.231, conditional-mean rms nan
+      x=0.1: z=0.001, LMMSE 0.001, cond. mean 0.007
+      x=0.5: z=0.125, LMMSE 0.175, cond. mean 0.499
+      x=0.9: z=0.729, LMMSE 1.020, cond. mean 0.900
+9.6 sigma=0.1: LMMSE gain 1.308, LMMSE rms 0.268, conditional-mean rms 0.235
+      x=0.1: z=0.001, LMMSE 0.001, cond. mean 0.001
+      x=0.5: z=0.125, LMMSE 0.164, cond. mean 0.218
+      x=0.9: z=0.729, LMMSE 0.954, cond. mean 0.894

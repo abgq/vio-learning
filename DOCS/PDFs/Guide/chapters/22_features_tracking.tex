@@ -242,7 +242,9 @@ track.
 
 The front end is the one component allowed to allocate (AGENTS.md E4), because OpenCV allocates internally, but it must reuse its buffers. In practice: keep the
 previous pyramid and swap it with the new one instead of rebuilding storage; preallocate point vectors with \code{reserve}; keep the \code{cv::Mat} objects as members
-so that their memory is reused when sizes do not change; and \emph{measure} the remaining allocations with the allocation guard rather than claiming they are zero.
+so that their memory is reused when sizes do not change; and \emph{measure} the remaining allocations rather than claiming they are zero. OpenCV takes the
+pixel buffers from its own \code{malloc}-based allocator, but it creates a small header with \code{new} for each one, so the \code{operator new} guard counts every new
+\code{cv::Mat} buffer, though not its size. A counting allocator installed with \code{cv::Mat::setDefaultAllocator} measures the bytes as well.
 Feature tracking is typically the most expensive part of the pipeline in time, too, so bucketing parameters, window size and pyramid depth are the main
 performance knobs.
 

@@ -1,0 +1,9 @@
+17.4 relative std of a sample std from 400 runs: 0.035 (two-sigma band +-7%)
+17.5 after 45 deg: diag [5.05e-05 5.05e-05 1.00e-06], off-diagonal (0,1) -4.950e-05, eigenvalues [1.e-06 1.e-06 1.e-04]
+17.5 after 90 deg: diag [1.e-06 1.e-04 1.e-06], off-diagonal (0,1) -6.062e-21, eigenvalues [1.e-06 1.e-06 1.e-04]
+17.6 power (M runs):
+     variance ratio 1.21: [np.float64(0.29), np.float64(0.5), np.float64(0.86), np.float64(0.95)]
+     variance ratio 0.81: [np.float64(0.28), np.float64(0.53), np.float64(0.91), np.float64(0.98)]
+     ratio 1.21: 95% power first reached at M = 720
+     ratio 0.81: 95% power first reached at M = 600
+     normal approximation: z-values 1.96 1.645
